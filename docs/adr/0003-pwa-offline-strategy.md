@@ -25,6 +25,9 @@ A throwaway spike (`/spike`, plain JS, in-memory server state) was tested on an 
 ## Validation gate (passed)
 Before building the online core, a throwaway spike (roadmap milestone 1) had to show on a real phone in airplane mode that the approach works. If it only works with heavy client-side code that duplicates the app, we supersede this ADR and ADR 0002 and reconsider the framework (for example a client-side-first app with a sync API) instead of forcing LiveView.
 
+## Implementation (milestone 5)
+See ADR 0008. It refines the decision above: there is one service worker with scope `/` (not a separate one) that answers failed navigations with the offline shell at `/offline`. The spike code was removed when this shipped.
+
 ## Consequences
 - Adds client-side JavaScript beyond plain LiveView, bundled via `app.js` as per project guidelines.
 - Full offline editing is explicitly out of scope for the MVP.

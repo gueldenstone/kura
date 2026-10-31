@@ -30,3 +30,4 @@ Template:
 | [0005](0005-item-stock-model.md) | Items with per-item stock tracking in one resource | Accepted |
 | [0006](0006-visual-design.md) | Visual design: market stall light, dark chocolate dark | Accepted |
 | [0007](0007-shopping-list-model.md) | Shopping list model and live sync | Accepted |
+| [0008](0008-offline-implementation.md) | How offline works | Accepted |

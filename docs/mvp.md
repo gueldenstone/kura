@@ -30,7 +30,7 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 - Both users see the same list; changes show up on the other phone without a reload.
 
 ### PWA and offline
-- Installable on both phones.
+- Installable on both phones (home screen icon, no browser bars).
 - Inventory and shopping list readable without signal.
 - Checking off entries works without signal and syncs when the connection returns (see ADR 0003).
 

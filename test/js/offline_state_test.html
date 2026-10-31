@@ -1,0 +1,119 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>offline/state.js tests</title>
+<!--
+  Tests for assets/js/offline/state.js. There is no Node here, so they run in Chrome. From the
+  project root, take a screenshot of the page and read the PASS/FAIL lines in it:
+
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+      --allow-file-access-from-files --user-data-dir=/tmp/kura-js-test \
+      --window-size=900,700 --screenshot=/tmp/kura-js-test.png file://$PWD/test/js/offline_state_test.html
+
+  (Chrome keeps running after the screenshot; stop it once the file exists.) Or just open the file
+  in a browser started with --allow-file-access-from-files. The last line says ALL PASSED or how
+  many tests failed.
+-->
+<pre id="out"></pre>
+<script type="module">
+  import {toggleChange, applyQueue, stockLabel, tileText, matches} from "../../assets/js/offline/state.js"
+
+  const out = document.getElementById("out")
+  let failed = 0
+  const test = (name, fn) => {
+    try { fn(); out.append(`PASS ${name}\n`) } catch (error) { failed++; out.append(`FAIL ${name}: ${error.message}\n`) }
+  }
+  const same = (actual, expected) => {
+    if (JSON.stringify(actual) !== JSON.stringify(expected))
+      throw new Error(`expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`)
+  }
+
+  const snapshot = () => ({
+    generated_at: "2026-10-31T10:00:00Z",
+    items: [
+      {id: "i1", name: "Apples", emoji: "🍎", tracking: "count", stock_count: 0, stock_level: null, empty: true, on_list: true},
+      {id: "i2", name: "Walnuts", emoji: null, tracking: "level", stock_count: null, stock_level: "empty", empty: true, on_list: true},
+      {id: "i3", name: "Rice", emoji: null, tracking: "level", stock_count: null, stock_level: "plenty", empty: false, on_list: false}
+    ],
+    open: [
+      {id: "e1", item_id: "i1", name: "Apples", emoji: "🍎", quantity: 6, checked_at: null},
+      {id: "e2", item_id: "i2", name: "Walnuts", emoji: null, quantity: 1, checked_at: null}
+    ],
+    checked: [{id: "e3", item_id: "i3", name: "Rice", emoji: null, quantity: 1, checked_at: "2026-10-31T09:00:00Z"}]
+  })
+
+  test("toggleChange queues a check-off", () => {
+    same(toggleChange([], "check", "e1", 5), [{op: "check", entry_id: "e1", ts: 5}])
+  })
+  test("toggleChange cancels a queued change when it is flipped", () => {
+    same(toggleChange([{op: "check", entry_id: "e1", ts: 5}], "uncheck", "e1", 9), [])
+  })
+  test("toggleChange ignores the same change twice", () => {
+    const queue = [{op: "check", entry_id: "e1", ts: 5}]
+    same(toggleChange(queue, "check", "e1", 9), queue)
+  })
+  test("toggleChange keeps changes for other entries", () => {
+    const queue = [{op: "check", entry_id: "e1", ts: 5}]
+    same(toggleChange(queue, "check", "e2", 9).map(c => c.entry_id), ["e1", "e2"])
+  })
+
+  test("applyQueue without changes is the snapshot", () => same(applyQueue(snapshot(), []), snapshot()))
+  test("applyQueue does not modify its input", () => {
+    const original = snapshot()
+    applyQueue(original, [{op: "check", entry_id: "e1"}])
+    same(original, snapshot())
+  })
+  test("check moves the entry to the cart and restocks a count item", () => {
+    const result = applyQueue(snapshot(), [{op: "check", entry_id: "e1"}])
+    same(result.open.map(e => e.id), ["e2"])
+    same(result.checked.map(e => e.id), ["e1", "e3"])
+    const apples = result.items.find(i => i.id === "i1")
+    same([apples.stock_count, apples.empty, apples.on_list], [6, false, false])
+  })
+  test("check sets a level item to plenty", () => {
+    const walnuts = applyQueue(snapshot(), [{op: "check", entry_id: "e2"}]).items.find(i => i.id === "i2")
+    same([walnuts.stock_level, walnuts.empty, walnuts.on_list], ["plenty", false, false])
+  })
+  test("uncheck puts the entry back, sorted by name, and takes the count off again", () => {
+    const result = applyQueue(snapshot(), [{op: "uncheck", entry_id: "e3"}])
+    same(result.open.map(e => e.id), ["e1", "e3", "e2"])
+    same(result.checked, [])
+    same(result.items.find(i => i.id === "i3").on_list, true)
+  })
+  test("uncheck never takes a count below zero", () => {
+    const base = snapshot()
+    base.checked.push({id: "e5", item_id: "i1", name: "Apples", emoji: "🍎", quantity: 6, checked_at: "2026-10-31T09:30:00Z"})
+    const apples = applyQueue(base, [{op: "uncheck", entry_id: "e5"}]).items.find(i => i.id === "i1")
+    same([apples.stock_count, apples.empty], [0, true])
+  })
+  test("check then uncheck in the queue ends where it started", () => {
+    const result = applyQueue(snapshot(), [{op: "check", entry_id: "e1"}, {op: "uncheck", entry_id: "e1"}])
+    same(result.open.map(e => e.id), ["e1", "e2"])
+    same(result.items.find(i => i.id === "i1").stock_count, 0)
+  })
+  test("changes for unknown or mismatched entries are ignored", () => {
+    const result = applyQueue(snapshot(), [
+      {op: "check", entry_id: "nope"},
+      {op: "uncheck", entry_id: "e1"},
+      {op: "dance", entry_id: "e1"}
+    ])
+    same(result, snapshot())
+  })
+
+  test("stockLabel", () => {
+    const [apples, walnuts, rice] = snapshot().items
+    same(stockLabel(apples), "Empty")
+    same(stockLabel({...apples, empty: false, stock_count: 3}), "3 in stock")
+    same(stockLabel({...walnuts, empty: false, stock_level: "low"}), "Running low")
+    same(stockLabel(rice), "Plenty")
+  })
+  test("tileText falls back to the first letter", () => {
+    const [apples, , rice] = snapshot().items
+    same([tileText(apples), tileText(rice)], ["🍎", "R"])
+  })
+  test("matches ignores case and surrounding spaces", () => {
+    const [, walnuts] = snapshot().items
+    same([matches(walnuts, " ALN "), matches(walnuts, "zz"), matches(walnuts, "")], [true, false, true])
+  })
+
+  out.append(`RESULT ${failed === 0 ? "ALL PASSED" : failed + " FAILED"}\n`)
+</script>

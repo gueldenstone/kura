@@ -2,7 +2,7 @@
 
 The MVP (`docs/mvp.md`) is delivered by milestones 1–6. Update this file whenever a milestone changes or completes.
 
-Offline was the riskiest requirement, so it was verified first. The spike passed (see ADR 0003). The spike code (`/spike`, `priv/spike/`, `KuraWeb.SpikeController`) is kept as reference for milestone 5 and deleted when that ships.
+Offline was the riskiest requirement, so it was verified first. The spike passed (see ADR 0003). The spike code has been removed; ADR 0008 describes the real implementation.
 
 ## MVP
 
@@ -12,7 +12,7 @@ Offline was the riskiest requirement, so it was verified first. The spike passed
 | 2 | Foundation | Username/password auth for two users (ADR 0004), mobile app shell with tab bar, `mix kura.user.create` | Done |
 | 3 | Inventory | Item catalogue, count and level tracking, mark empty with undo, search, add/edit/delete (ADR 0005). Adding to the shopping list on "empty" comes with milestone 4 | Done |
 | 4 | Shopping list | Entries with quantity, add from catalogue or as new item, check-off restocks, undo, hide checked, live sync between phones, inventory marker and tab badge (ADR 0007) | Done |
-| 5 | PWA and offline | Productionise the spike: installable, offline reads, queued offline check-offs | Todo |
+| 5 | PWA and offline | Installable, offline reads and search, queued offline check-offs that sync on reconnect (ADR 0008). Needs a test on a real phone in airplane mode | Built, to be verified on the iPhone |
 | 6 | Deployment | Dockerfile, release config, Traefik labels, deploy to the VPS over SSH, SQLite on a volume with backups | Todo |
 
 ## After the MVP (unordered ideas)
