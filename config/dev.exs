@@ -23,7 +23,7 @@ config :kura, Kura.Repo,
 config :kura, KuraWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}],
+  http: [ip: if(System.get_env("KURA_BIND_ALL"), do: {0, 0, 0, 0}, else: {127, 0, 0, 1})],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,

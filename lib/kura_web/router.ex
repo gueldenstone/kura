@@ -70,6 +70,15 @@ defmodule KuraWeb.Router do
     )
   end
 
+  # THROWAWAY offline spike (docs/adr/0003); remove with KuraWeb.SpikeController
+  scope "/spike", KuraWeb do
+    get "/", SpikeController, :page
+    get "/api/state", SpikeController, :state
+    post "/api/check", SpikeController, :check
+    post "/api/reset", SpikeController, :reset
+    get "/:name", SpikeController, :asset
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", KuraWeb do
   #   pipe_through :api
