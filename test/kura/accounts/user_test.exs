@@ -1,5 +1,5 @@
 defmodule Kura.Accounts.UserTest do
-  use Kura.DataCase, async: true
+  use Kura.DataCase
 
   alias Kura.Accounts
   alias Kura.Accounts.User

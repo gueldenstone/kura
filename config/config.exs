@@ -63,7 +63,7 @@ config :spark,
 config :kura,
   ecto_repos: [Kura.Repo],
   generators: [timestamp_type: :utc_datetime],
-  ash_domains: [Kura.Accounts]
+  ash_domains: [Kura.Accounts, Kura.Inventory]
 
 # Configure the endpoint
 config :kura, KuraWeb.Endpoint,
