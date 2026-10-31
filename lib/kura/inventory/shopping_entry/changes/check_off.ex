@@ -1,12 +1,13 @@
 defmodule Kura.Inventory.ShoppingEntry.Changes.CheckOff do
   @moduledoc """
   Marks the entry as checked off and restocks its item: a count item gains the entry's quantity,
-  a level item goes to plenty (the previous level is kept on the entry for undo).
+  a level item goes to plenty (the previous level is kept on the entry for undo). Entries that were
+  checked off over a day ago are cleared first: that is the start of a new shopping trip.
   """
   use Ash.Resource.Change
 
   alias Kura.Inventory
-  alias Kura.Inventory.Item
+  alias Kura.Inventory.{Item, ShoppingList}
 
   @impl true
   def change(changeset, _opts, context) do
@@ -15,6 +16,7 @@ defmodule Kura.Inventory.ShoppingEntry.Changes.CheckOff do
     changeset
     |> Ash.Changeset.before_action(fn changeset ->
       item = Ash.get!(Item, changeset.data.item_id, opts)
+      ShoppingList.hide_stale_checked(opts[:actor])
 
       changeset
       |> Ash.Changeset.force_change_attribute(:checked_at, DateTime.utc_now())

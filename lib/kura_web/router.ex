@@ -25,7 +25,7 @@ defmodule KuraWeb.Router do
     pipe_through :browser
 
     ash_authentication_live_session :authenticated_routes,
-      on_mount: [{KuraWeb.LiveUserAuth, :live_user_required}] do
+      on_mount: [{KuraWeb.LiveUserAuth, :live_user_required}, KuraWeb.LiveListCount] do
       live "/shopping-list", ShoppingListLive
       live "/inventory", InventoryLive
     end

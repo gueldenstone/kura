@@ -88,6 +88,73 @@ defmodule KuraWeb.InventoryLiveTest do
     end
   end
 
+  describe "the shopping list" do
+    test "an item on the list carries a marker, which goes once it is checked off", %{
+      conn: conn,
+      user: user
+    } do
+      apples = item(user, %{name: "Apples"})
+      rice = item(user, %{name: "Rice"})
+      entry = Inventory.add_entry!(%{item_id: apples.id}, actor: user)
+
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      assert has_element?(view, "#item-#{apples.id} [data-role=on-list]")
+      refute has_element?(view, "#item-#{rice.id} [data-role=on-list]")
+
+      Inventory.check_off_entry!(entry, actor: user)
+
+      refute has_element?(view, "#item-#{apples.id} [data-role=on-list]")
+    end
+
+    test "marking empty puts the item on the list, and undo takes it off again", %{
+      conn: conn,
+      user: user
+    } do
+      apples = item(user, %{name: "Apples", stock_count: 2, usual_amount: 6})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[phx-click=mark_empty]") |> render_click()
+
+      assert [%{quantity: 6}] = Inventory.list_open_entries!(actor: user)
+      assert has_element?(view, "#item-#{apples.id} [data-role=on-list]")
+
+      view |> element("#undo button") |> render_click()
+
+      assert Inventory.list_open_entries!(actor: user) == []
+      refute has_element?(view, "#item-#{apples.id} [data-role=on-list]")
+    end
+
+    test "undo keeps an entry that was on the list already", %{conn: conn, user: user} do
+      walnuts = item(user, %{name: "Walnuts", tracking: :level})
+      Inventory.add_entry!(%{item_id: walnuts.id, quantity: 3}, actor: user)
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{walnuts.id} button[phx-click=mark_empty]") |> render_click()
+      view |> element("#undo button") |> render_click()
+
+      assert [%{quantity: 3}] = Inventory.list_open_entries!(actor: user)
+    end
+
+    test "the Shopping list tab shows how many entries are open", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples"})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[phx-click=mark_empty]") |> render_click()
+
+      assert has_element?(view, "nav [data-role=open-count]", "1")
+    end
+  end
+
+  test "stock changed elsewhere shows up live", %{conn: conn, user: user} do
+    apples = item(user, %{name: "Apples", stock_count: 3})
+    {:ok, view, _html} = live(conn, ~p"/inventory")
+
+    Inventory.set_item_count!(apples, 9, actor: user)
+
+    assert has_element?(view, "#item-#{apples.id} [data-role=stock]", "9 in stock")
+  end
+
   test "plus and minus change a count", %{conn: conn, user: user} do
     apples = item(user, %{name: "Apples", stock_count: 2})
     {:ok, view, _html} = live(conn, ~p"/inventory")

@@ -17,14 +17,16 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 ### Stock
 - View the full inventory, with the current stock of each item.
 - Adjust stock (set a count, set a level).
-- **Mark empty** in one tap; this adds the item to the shopping list.
+- **Mark empty** in one tap; this adds the item to the shopping list with its usual amount (unless it is already on the list). Undo takes the entry off again.
+- Items that are on the list carry a small cart marker in the inventory.
 
 ### Shopping list
 - Entries have an item and a quantity.
 - Add entries manually, from the catalogue or by creating a new item on the spot; edit quantity; remove entries.
 - **Check off** an entry: the item is restocked (count: add the quantity; level: set to plenty) and the entry leaves the open list.
 - **Undo a check-off**: checked-off entries stay visible in a "checked off" section; unchecking one reverses its restock (count: subtract the quantity again; level: restore the previous level) and returns it to the open list.
-- Checked-off entries stay in the "checked off" section until the next shopping trip starts or the user clears them manually. A **Hide checked items** action clears the section; hidden entries are no longer undoable.
+- Checked-off entries stay in the "In the cart" section until the next shopping trip starts (the first check-off after a day has passed) or the user taps **Hide checked**. Hidden entries are no longer undoable.
+- The Shopping list tab shows how many entries are still open.
 - Both users see the same list; changes show up on the other phone without a reload.
 
 ### PWA and offline
@@ -37,4 +39,3 @@ Offline editing beyond check-off, recipes and meal planning, barcode scanning, p
 
 ## Open questions
 - Is a count item automatically "low" at some threshold, or only empty at 0? (MVP: only empty at 0.)
-- What exactly starts a "shopping trip"? (Proposal: the first check-off after the previous trip's entries were hidden or after a day has passed; to be settled when building milestone 4.)

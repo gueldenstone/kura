@@ -23,6 +23,7 @@ defmodule KuraWeb.Layouts do
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
   attr :current_user, :map, required: true, doc: "the signed-in user"
+  attr :open_count, :integer, default: 0, doc: "open shopping list entries, shown on its tab"
 
   attr :active, :atom,
     values: [:shopping_list, :inventory],
@@ -59,7 +60,12 @@ defmodule KuraWeb.Layouts do
         aria-label="Main"
       >
         <div class="mx-auto grid max-w-2xl grid-cols-2 gap-2">
-          <.tab href={~p"/shopping-list"} icon="hero-shopping-cart" active={@active == :shopping_list}>
+          <.tab
+            href={~p"/shopping-list"}
+            icon="hero-shopping-cart"
+            active={@active == :shopping_list}
+            badge={@open_count}
+          >
             Shopping list
           </.tab>
           <.tab href={~p"/inventory"} icon="hero-archive-box" active={@active == :inventory}>
@@ -76,6 +82,7 @@ defmodule KuraWeb.Layouts do
   attr :href, :string, required: true
   attr :icon, :string, required: true
   attr :active, :boolean, default: false
+  attr :badge, :integer, default: 0
   slot :inner_block, required: true
 
   defp tab(assigns) do
@@ -89,7 +96,16 @@ defmodule KuraWeb.Layouts do
         !@active && "text-base-content/55 hover:text-base-content"
       ]}
     >
-      <.icon name={@icon} class="size-6" />
+      <span class="relative">
+        <.icon name={@icon} class="size-6" />
+        <span
+          :if={@badge > 0}
+          data-role="open-count"
+          class="absolute -top-1.5 -right-3.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-[11px] font-extrabold text-primary-content"
+        >
+          {@badge}
+        </span>
+      </span>
       {render_slot(@inner_block)}
     </.link>
     """

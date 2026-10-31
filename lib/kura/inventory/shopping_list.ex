@@ -24,12 +24,33 @@ defmodule Kura.Inventory.ShoppingList do
     end
   end
 
+  # A new shopping trip starts at the first check-off after this much time has passed.
+  @trip_gap_hours 24
+
   @doc "Deletes all checked-off entries. They can no longer be unchecked."
   def hide_checked(actor) do
     actor
     |> then(&Inventory.list_checked_entries!(actor: &1))
-    |> Ash.bulk_destroy!(:destroy, %{}, actor: actor, return_errors?: true)
+    |> destroy(actor)
+  end
 
+  @doc """
+  Deletes the entries that were checked off more than a day ago, so a new shopping trip starts with
+  an empty cart. Called when something is checked off.
+  """
+  def hide_stale_checked(actor) do
+    cutoff = DateTime.add(DateTime.utc_now(), -@trip_gap_hours, :hour)
+
+    actor
+    |> then(&Inventory.list_checked_entries!(actor: &1))
+    |> Enum.filter(&(DateTime.compare(&1.checked_at, cutoff) == :lt))
+    |> destroy(actor)
+  end
+
+  defp destroy([], _actor), do: :ok
+
+  defp destroy(entries, actor) do
+    Ash.bulk_destroy!(entries, :destroy, %{}, actor: actor, return_errors?: true)
     :ok
   end
 end

@@ -96,6 +96,22 @@ defmodule Kura.Inventory.ShoppingEntryTest do
       assert entry.previous_level == :low
     end
 
+    test "starts a new trip: entries checked off over a day ago are cleared", %{actor: actor} do
+      old = Inventory.check_off_entry!(add(actor, apples(actor)), actor: actor)
+      Ash.Seed.update!(old, %{checked_at: DateTime.add(DateTime.utc_now(), -25, :hour)})
+      recent = Inventory.check_off_entry!(add(actor, walnuts(actor)), actor: actor)
+
+      assert Enum.map(Inventory.list_checked_entries!(actor: actor), & &1.id) == [recent.id]
+    end
+
+    test "keeps entries checked off earlier today", %{actor: actor} do
+      first = Inventory.check_off_entry!(add(actor, apples(actor)), actor: actor)
+      second = Inventory.check_off_entry!(add(actor, walnuts(actor)), actor: actor)
+
+      assert Enum.sort(Enum.map(Inventory.list_checked_entries!(actor: actor), & &1.id)) ==
+               Enum.sort([first.id, second.id])
+    end
+
     test "cannot be done twice", %{actor: actor} do
       item = apples(actor)
       entry = Inventory.check_off_entry!(add(actor, item), actor: actor)

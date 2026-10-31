@@ -1,6 +1,8 @@
 defmodule KuraWeb.InventoryLive do
   use KuraWeb, :live_view
 
+  import KuraWeb.InventoryComponents
+
   alias Kura.Inventory
   alias Kura.Inventory.Item
 
@@ -102,8 +104,15 @@ defmodule KuraWeb.InventoryLive do
 
   def handle_event("mark_empty", %{"id" => id}, socket) do
     with_item(socket, id, fn item ->
-      undo = %{id: item.id, name: item.name, previous: previous_stock(item)}
-      Inventory.mark_item_empty!(item, actor: actor(socket))
+      marked = Inventory.mark_item_empty!(item, actor: actor(socket))
+
+      undo = %{
+        id: item.id,
+        name: item.name,
+        previous: previous_stock(item),
+        added_entry: marked.__metadata__.added_entry
+      }
+
       {:noreply, socket |> assign(undo: undo) |> load_items()}
     end)
   end
@@ -111,11 +120,19 @@ defmodule KuraWeb.InventoryLive do
   def handle_event("undo", _params, %{assigns: %{undo: %{} = undo}} = socket) do
     with_item(socket, undo.id, fn item ->
       restore_stock(item, undo.previous, actor(socket))
+      remove_added_entry(undo.added_entry, actor(socket))
       {:noreply, socket |> assign(undo: nil) |> load_items()}
     end)
   end
 
   def handle_event("undo", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info(%Phoenix.Socket.Broadcast{topic: "kitchen:changed"}, socket) do
+    {:noreply, load_items(socket)}
+  end
+
+  def handle_info(_message, socket), do: {:noreply, socket}
 
   defp actor(socket), do: socket.assigns.current_user
 
@@ -124,7 +141,12 @@ defmodule KuraWeb.InventoryLive do
   end
 
   defp load_items(socket) do
-    items = Inventory.search_items!(socket.assigns.query, actor: actor(socket), load: [:empty?])
+    items =
+      Inventory.search_items!(socket.assigns.query,
+        actor: actor(socket),
+        load: [:empty?, :on_list?]
+      )
+
     assign(socket, :items, items)
   end
 
@@ -146,6 +168,16 @@ defmodule KuraWeb.InventoryLive do
   defp previous_stock(%Item{tracking: :count, stock_count: count}), do: {:count, count}
   defp previous_stock(%Item{tracking: :level, stock_level: level}), do: {:level, level}
 
+  # Takes back the list entry that "mark empty" created, unless it has been checked off since.
+  defp remove_added_entry(nil, _actor), do: :ok
+
+  defp remove_added_entry(%{id: id}, actor) do
+    case Inventory.get_entry(id, actor: actor) do
+      {:ok, %{checked_at: nil} = entry} -> Inventory.remove_entry!(entry, actor: actor)
+      _ -> :ok
+    end
+  end
+
   defp restore_stock(item, {:count, count}, actor),
     do: Inventory.set_item_count!(item, count, actor: actor)
 
@@ -162,13 +194,15 @@ defmodule KuraWeb.InventoryLive do
   defp stock_label(%Item{stock_level: :low}), do: "Running low"
   defp stock_label(%Item{stock_level: :plenty}), do: "Plenty"
 
-  defp tile_text(%Item{emoji: emoji}) when is_binary(emoji), do: emoji
-  defp tile_text(%Item{name: name}), do: name |> to_string() |> String.first() |> String.upcase()
-
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_user={@current_user} active={:inventory}>
+    <Layouts.app
+      flash={@flash}
+      current_user={@current_user}
+      active={:inventory}
+      open_count={@open_count}
+    >
       <h1 class="font-display text-4xl leading-none font-bold tracking-tight">Inventory</h1>
 
       <.form for={@search_form} id="search-form" phx-change="search" phx-submit="search" class="mt-5">
@@ -198,42 +232,7 @@ defmodule KuraWeb.InventoryLive do
         </button>
       </div>
 
-      <.form
-        :if={@new_form}
-        for={@new_form}
-        id="new-item-form"
-        phx-change="validate_new"
-        phx-submit="create"
-        class="mb-3 space-y-1 rounded-box bg-base-100 p-4 shadow-card"
-      >
-        <.input field={@new_form[:name]} type="text" label="Name" />
-        <.input
-          field={@new_form[:emoji]}
-          type="text"
-          label="Emoji (optional)"
-          placeholder="Use your emoji keyboard"
-          autocomplete="off"
-          phx-mounted={JS.focus()}
-        />
-        <.input
-          field={@new_form[:tracking]}
-          type="select"
-          label="Track stock as"
-          options={[{"A count (e.g. apples)", :count}, {"A level: plenty, low, empty", :level}]}
-        />
-        <.input
-          field={@new_form[:usual_amount]}
-          type="number"
-          label="Usual amount to buy"
-          min="1"
-        />
-        <div class="flex gap-2 pt-2">
-          <button type="submit" class="btn btn-primary rounded-full">Add item</button>
-          <button type="button" phx-click="cancel_add" class="btn btn-ghost rounded-full">
-            Cancel
-          </button>
-        </div>
-      </.form>
+      <.new_item_form :if={@new_form} form={@new_form} />
 
       <p
         :if={@items == [] and String.trim(@query) == ""}
@@ -251,15 +250,7 @@ defmodule KuraWeb.InventoryLive do
           class="rounded-box bg-base-100 p-3.5 shadow-card"
         >
           <div class="flex items-center gap-3">
-            <span
-              data-role="tile"
-              class={[
-                "grid size-12 shrink-0 place-items-center rounded-2xl bg-base-300/60 text-2xl font-bold text-base-content/70",
-                item.empty? && "opacity-60 grayscale"
-              ]}
-            >
-              {tile_text(item)}
-            </span>
+            <.item_tile item={item} dimmed={item.empty?} on_list={item.on_list?} />
             <div class="min-w-0 flex-1">
               <div class="truncate text-[17px] font-bold">{item.name}</div>
               <div

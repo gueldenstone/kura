@@ -7,7 +7,8 @@ defmodule Kura.Inventory.Item do
     otp_app: :kura,
     domain: Kura.Inventory,
     data_layer: AshSqlite.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Ash.Policy.Authorizer],
+    notifiers: [Ash.Notifier.PubSub]
 
   sqlite do
     table "items"
@@ -103,6 +104,16 @@ defmodule Kura.Inventory.Item do
     policy always() do
       authorize_if actor_present()
     end
+  end
+
+  pub_sub do
+    module KuraWeb.Endpoint
+    prefix "kitchen"
+
+    # Every change goes to one topic; the LiveViews simply reload when anything happens.
+    publish_all :create, "changed"
+    publish_all :update, "changed"
+    publish_all :destroy, "changed"
   end
 
   attributes do
