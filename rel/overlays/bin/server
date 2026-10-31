@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+cd -P -- "$(dirname -- "$0")"
+./kura eval "Kura.Release.migrate()"
+PHX_SERVER=true exec ./kura start

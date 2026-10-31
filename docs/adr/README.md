@@ -31,3 +31,4 @@ Template:
 | [0006](0006-visual-design.md) | Visual design: market stall light, dark chocolate dark | Accepted |
 | [0007](0007-shopping-list-model.md) | Shopping list model and live sync | Accepted |
 | [0008](0008-offline-implementation.md) | How offline works | Accepted |
+| [0009](0009-deployment.md) | Deployment: one Docker image, SQLite on a volume | Accepted |

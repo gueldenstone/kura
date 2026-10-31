@@ -13,7 +13,7 @@ Offline was the riskiest requirement, so it was verified first. The spike passed
 | 3 | Inventory | Item catalogue, count and level tracking, mark empty with undo, search, add/edit/delete (ADR 0005). Adding to the shopping list on "empty" comes with milestone 4 | Done |
 | 4 | Shopping list | Entries with quantity, add from catalogue or as new item, check-off restocks, undo, hide checked, live sync between phones, inventory marker and tab badge (ADR 0007) | Done |
 | 5 | PWA and offline | Installable, offline reads and search, queued offline check-offs that sync on reconnect (ADR 0008). Verified on an iPhone in airplane mode; switching to the offline screens after a signal drop takes a few seconds | Done |
-| 6 | Deployment | Dockerfile, release config, Traefik labels, deploy to the VPS over SSH, SQLite on a volume with backups | Todo |
+| 6 | Deployment | Dockerfile, release config, GitHub Actions, Dependabot (ADR 0009) done and the image runs locally. Traefik labels, deploy over SSH and backups still open | In progress |
 
 ## After the MVP (unordered ideas)
 
