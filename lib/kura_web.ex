@@ -17,7 +17,9 @@ defmodule KuraWeb do
   those modules here.
   """
 
-  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt)
+  def static_paths,
+    do:
+      ~w(assets fonts images favicon.ico robots.txt manifest.webmanifest icon-192.png icon-512.png apple-touch-icon.png)
 
   def router do
     quote do

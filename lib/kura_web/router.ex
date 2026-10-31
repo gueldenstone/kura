@@ -15,6 +15,12 @@ defmodule KuraWeb.Router do
     plug :load_from_session
   end
 
+  pipeline :offline_api do
+    plug :accepts, ["json"]
+    plug :fetch_session
+    plug :load_from_session
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
     plug :load_from_bearer
@@ -25,7 +31,7 @@ defmodule KuraWeb.Router do
     pipe_through :browser
 
     ash_authentication_live_session :authenticated_routes,
-      on_mount: [{KuraWeb.LiveUserAuth, :live_user_required}, KuraWeb.LiveListCount] do
+      on_mount: [{KuraWeb.LiveUserAuth, :live_user_required}, KuraWeb.LiveKitchenSync] do
       live "/shopping-list", ShoppingListLive
       live "/inventory", InventoryLive
     end
@@ -44,6 +50,23 @@ defmodule KuraWeb.Router do
     sign_in_route auth_routes_prefix: "/auth",
                   on_mount: [{KuraWeb.LiveUserAuth, :live_no_user}],
                   overrides: [KuraWeb.AuthOverrides, AshAuthentication.Phoenix.Overrides.Default]
+  end
+
+  scope "/", KuraWeb do
+    get "/sw.js", PwaController, :service_worker
+  end
+
+  scope "/offline", KuraWeb do
+    pipe_through :offline_api
+
+    get "/state", OfflineController, :state
+    post "/sync", OfflineController, :sync
+  end
+
+  scope "/", KuraWeb do
+    pipe_through :browser
+
+    get "/offline", OfflineController, :shell
   end
 
   # THROWAWAY offline spike (docs/adr/0003); remove with KuraWeb.SpikeController
