@@ -71,7 +71,7 @@ defmodule Kura.Inventory.Item do
     end
 
     update :mark_empty do
-      description "Sets the stock to empty: a count of 0, or the level `:empty`."
+      description "Sets the stock to empty (a count of 0, or the level `:empty`) and puts the item on the shopping list."
       accept []
       require_atomic? false
 
@@ -81,6 +81,8 @@ defmodule Kura.Inventory.Item do
           :level -> Ash.Changeset.force_change_attribute(changeset, :stock_level, :empty)
         end
       end
+
+      change Kura.Inventory.Item.Changes.PutOnList
     end
 
     read :search do
@@ -145,7 +147,13 @@ defmodule Kura.Inventory.Item do
     timestamps()
   end
 
+  relationships do
+    has_many :shopping_entries, Kura.Inventory.ShoppingEntry
+  end
+
   calculations do
+    calculate :on_list?, :boolean, expr(exists(shopping_entries, is_nil(checked_at)))
+
     calculate :empty?,
               :boolean,
               expr(
