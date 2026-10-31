@@ -27,12 +27,12 @@ defmodule Kura.Accounts.User do
     end
 
     strategies do
-      magic_link do
-        identity_field :email
-        registration_enabled? true
-        require_interaction? true
-
-        sender Kura.Accounts.User.Senders.SendMagicLinkEmail
+      password :password do
+        identity_field :username
+        hashed_password_field :hashed_password
+        # Accounts are created by the owner (mix kura.user.create), never by visitors.
+        registration_enabled? false
+        sign_in_tokens_enabled? true
       end
 
       remember_me :remember_me
@@ -49,45 +49,44 @@ defmodule Kura.Accounts.User do
       prepare AshAuthentication.Preparations.FilterBySubject
     end
 
-    read :get_by_email do
-      description "Looks up a user by their email"
-      get_by :email
-    end
+    read :sign_in_with_password do
+      description "Attempt to sign in using a username and password."
+      get? true
 
-    create :sign_in_with_magic_link do
-      description "Sign in or register a user with magic link."
-
-      argument :token, :string do
-        description "The token from the magic link that was sent to the user"
-        allow_nil? false
-      end
+      argument :username, :ci_string, allow_nil?: false
+      argument :password, :string, allow_nil?: false, sensitive?: true
 
       argument :remember_me, :boolean do
-        description "Whether to generate a remember me token"
+        description "Whether to generate a remember me token."
         allow_nil? true
       end
 
-      upsert? true
-      upsert_identity :unique_email
-      upsert_fields [:email]
+      prepare AshAuthentication.Strategy.Password.SignInPreparation
 
-      # Uses the information from the token to create or sign in the user
-      change AshAuthentication.Strategy.MagicLink.SignInChange
-
-      change {AshAuthentication.Strategy.RememberMe.MaybeGenerateTokenChange,
-              strategy_name: :remember_me}
+      prepare {AshAuthentication.Strategy.RememberMe.MaybeGenerateTokenPreparation,
+               strategy_name: :remember_me}
 
       metadata :token, :string do
+        description "A JWT that can be used to authenticate the user."
         allow_nil? false
+      end
+
+      metadata :remember_me, :map do
+        description "A map that includes the remember me token options."
+        allow_nil? true
       end
     end
 
-    action :request_magic_link do
-      argument :email, :ci_string do
-        allow_nil? false
-      end
+    create :create do
+      description "Create an account. Used by `mix kura.user.create`, not exposed to visitors."
+      accept [:username]
 
-      run AshAuthentication.Strategy.MagicLink.Request
+      argument :password, :string, allow_nil?: false, sensitive?: true
+
+      validate string_length(:password, min: 8)
+
+      change set_context(%{strategy_name: :password})
+      change AshAuthentication.Strategy.Password.HashPasswordChange
     end
   end
 
@@ -100,13 +99,15 @@ defmodule Kura.Accounts.User do
   attributes do
     uuid_primary_key :id
 
-    attribute :email, :ci_string do
+    attribute :username, :ci_string do
       allow_nil? false
       public? true
     end
+
+    attribute :hashed_password, :string, allow_nil?: false, sensitive?: true
   end
 
   identities do
-    identity :unique_email, [:email]
+    identity :unique_username, [:username], pre_check?: true
   end
 end

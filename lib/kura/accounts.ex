@@ -7,6 +7,9 @@ defmodule Kura.Accounts do
 
   resources do
     resource Kura.Accounts.Token
-    resource Kura.Accounts.User
+
+    resource Kura.Accounts.User do
+      define :create_user, action: :create
+    end
   end
 end

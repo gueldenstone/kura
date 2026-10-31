@@ -35,4 +35,35 @@ defmodule KuraWeb.ConnCase do
     Kura.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
+
+  @password "correct horse battery"
+
+  @doc "Creates a user named `username` and returns it with its password."
+  def create_user(username \\ "lukas") do
+    user =
+      Kura.Accounts.create_user!(%{username: username, password: @password}, authorize?: false)
+
+    %{user: user, password: @password}
+  end
+
+  @doc """
+  Setup helper: creates a user and signs them in by storing a real session token.
+  """
+  def log_in_user(%{conn: conn}) do
+    %{user: user, password: password} = create_user()
+    strategy = AshAuthentication.Info.strategy!(Kura.Accounts.User, :password)
+
+    {:ok, signed_in} =
+      AshAuthentication.Strategy.action(strategy, :sign_in, %{
+        "username" => to_string(user.username),
+        "password" => password
+      })
+
+    conn =
+      conn
+      |> Phoenix.ConnTest.init_test_session(%{})
+      |> AshAuthentication.Plug.Helpers.store_in_session(signed_in)
+
+    %{conn: conn, user: signed_in, password: password}
+  end
 end

@@ -1,4 +1,4 @@
-defmodule Kura.Repo.Migrations.InitializeAndAddAuthenticationResourcesAndAddMagicLinkAuth do
+defmodule Kura.Repo.Migrations.InitialAccounts do
   @moduledoc """
   Updates resources based on their most recent snapshots.
 
@@ -9,11 +9,12 @@ defmodule Kura.Repo.Migrations.InitializeAndAddAuthenticationResourcesAndAddMagi
 
   def up do
     create table(:users, primary_key: false) do
-      add :email, :citext, null: false
+      add :hashed_password, :text, null: false
+      add :username, :citext, null: false
       add :id, :uuid, null: false, primary_key: true
     end
 
-    create unique_index(:users, [:email], name: "users_unique_email_index")
+    create unique_index(:users, [:username], name: "users_unique_username_index")
 
     create table(:tokens, primary_key: false) do
       add :updated_at, :utc_datetime_usec, null: false
@@ -29,7 +30,7 @@ defmodule Kura.Repo.Migrations.InitializeAndAddAuthenticationResourcesAndAddMagi
   def down do
     drop table(:tokens)
 
-    drop_if_exists unique_index(:users, [:email], name: "users_unique_email_index")
+    drop_if_exists unique_index(:users, [:username], name: "users_unique_username_index")
 
     drop table(:users)
   end

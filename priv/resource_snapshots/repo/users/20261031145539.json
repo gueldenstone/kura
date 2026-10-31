@@ -7,22 +7,32 @@
       "source": "id",
       "references": null,
       "allow_nil?": false,
-      "generated?": false,
-      "primary_key?": true
+      "primary_key?": true,
+      "generated?": false
     },
     {
       "default": "nil",
       "size": null,
       "type": "citext",
-      "source": "email",
+      "source": "username",
       "references": null,
       "allow_nil?": false,
-      "generated?": false,
-      "primary_key?": false
+      "primary_key?": false,
+      "generated?": false
+    },
+    {
+      "default": "nil",
+      "size": null,
+      "type": "text",
+      "source": "hashed_password",
+      "references": null,
+      "allow_nil?": false,
+      "primary_key?": false,
+      "generated?": false
     }
   ],
   "table": "users",
-  "hash": "FE3EE76284A091887ADC0D23C54B7E5B9A63492A30A7552B9101CB88D8F175B4",
+  "hash": "3AB6D12E53B9B73C4F63F711FA885A365B062E5B71D7BED706F3394FABE8928F",
   "multitenancy": {
     "global": null,
     "attribute": null,
@@ -30,19 +40,19 @@
   },
   "identities": [
     {
-      "name": "unique_email",
+      "name": "unique_username",
       "keys": [
-        "email"
+        "username"
       ],
-      "nils_distinct?": true,
       "base_filter": null,
-      "index_name": "users_unique_email_index"
+      "nils_distinct?": true,
+      "index_name": "users_unique_username_index"
     }
   ],
   "repo": "Elixir.Kura.Repo",
   "strict?": false,
-  "base_filter": null,
   "custom_indexes": [],
+  "base_filter": null,
   "custom_statements": [],
   "has_create_action": true
 }

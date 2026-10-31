@@ -63,8 +63,7 @@ config :spark,
 config :kura,
   ecto_repos: [Kura.Repo],
   generators: [timestamp_type: :utc_datetime],
-  ash_domains: [Kura.Accounts],
-  ash_authentication: [return_error_on_invalid_magic_link_token?: true]
+  ash_domains: [Kura.Accounts]
 
 # Configure the endpoint
 config :kura, KuraWeb.Endpoint,
