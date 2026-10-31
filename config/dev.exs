@@ -9,7 +9,7 @@ config :kura, Kura.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
-  database: "kura_dev",
+  database: "kura_dev.db",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10

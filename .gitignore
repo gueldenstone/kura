@@ -35,3 +35,8 @@ kura-*.tar
 npm-debug.log
 /assets/node_modules/
 
+
+# SQLite databases and their WAL sidecar files
+*.db
+*.db-shm
+*.db-wal
