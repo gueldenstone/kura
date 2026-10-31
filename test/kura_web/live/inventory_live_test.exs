@@ -27,7 +27,17 @@ defmodule KuraWeb.InventoryLiveTest do
 
     assert :binary.match(html, "Apples") < :binary.match(html, "Walnuts")
     assert has_element?(view, "#item-#{apples.id} [data-role=stock]", "3")
-    assert has_element?(view, "#item-#{walnuts.id} [data-role=stock]", "Low")
+    assert has_element?(view, "#item-#{walnuts.id} [data-role=stock]", "Running low")
+  end
+
+  test "each item shows its emoji, or its first letter without one", %{conn: conn, user: user} do
+    apples = item(user, %{name: "apples", emoji: "🍎"})
+    rice = item(user, %{name: "Rice"})
+
+    {:ok, view, _html} = live(conn, ~p"/inventory")
+
+    assert has_element?(view, "#item-#{apples.id} [data-role=tile]", "🍎")
+    assert has_element?(view, "#item-#{rice.id} [data-role=tile]", "R")
   end
 
   test "search filters the list as you type", %{conn: conn, user: user} do
@@ -102,7 +112,7 @@ defmodule KuraWeb.InventoryLiveTest do
     |> render_click()
 
     assert stored(user, walnuts).stock_level == :low
-    assert has_element?(view, "#item-#{walnuts.id} [data-role=stock]", "Low")
+    assert has_element?(view, "#item-#{walnuts.id} [data-role=stock]", "Running low")
   end
 
   describe "adding items" do
@@ -120,13 +130,14 @@ defmodule KuraWeb.InventoryLiveTest do
       view |> element("#add-item button") |> render_click()
 
       view
-      |> form("#new-item-form", item: %{tracking: "level", usual_amount: "2"})
+      |> form("#new-item-form", item: %{tracking: "level", usual_amount: "2", emoji: "🌰"})
       |> render_submit()
 
       [walnuts] = Inventory.search_items!("", actor: user)
       assert to_string(walnuts.name) == "Walnuts"
       assert walnuts.tracking == :level
       assert walnuts.usual_amount == 2
+      assert walnuts.emoji == "🌰"
       assert has_element?(view, "#item-#{walnuts.id}")
       refute has_element?(view, "#new-item-form")
     end
@@ -149,12 +160,13 @@ defmodule KuraWeb.InventoryLiveTest do
       view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
 
       view
-      |> form("#edit-item-form", item: %{name: "Green apples", usual_amount: "4"})
+      |> form("#edit-item-form", item: %{name: "Green apples", usual_amount: "4", emoji: "🍏"})
       |> render_submit()
 
       updated = stored(user, apples)
       assert to_string(updated.name) == "Green apples"
       assert updated.usual_amount == 4
+      assert updated.emoji == "🍏"
       assert has_element?(view, "#item-#{apples.id}", "Green apples")
       refute has_element?(view, "#edit-item-form")
     end

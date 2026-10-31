@@ -158,34 +158,43 @@ defmodule KuraWeb.InventoryLive do
   end
 
   defp stock_label(%Item{empty?: true}), do: "Empty"
-  defp stock_label(%Item{tracking: :count, stock_count: count}), do: to_string(count)
+  defp stock_label(%Item{tracking: :count, stock_count: count}), do: "#{count} in stock"
+  defp stock_label(%Item{stock_level: :low}), do: "Running low"
+  defp stock_label(%Item{stock_level: :plenty}), do: "Plenty"
 
-  defp stock_label(%Item{tracking: :level, stock_level: level}),
-    do: level |> to_string() |> String.capitalize()
+  defp tile_text(%Item{emoji: emoji}) when is_binary(emoji), do: emoji
+  defp tile_text(%Item{name: name}), do: name |> to_string() |> String.first() |> String.upcase()
 
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user} active={:inventory}>
-      <h1 class="text-2xl font-semibold tracking-tight">Inventory</h1>
+      <h1 class="font-display text-4xl leading-none font-bold tracking-tight">Inventory</h1>
 
-      <.form for={@search_form} id="search-form" phx-change="search" phx-submit="search" class="mt-4">
-        <.input
-          field={@search_form[:query]}
-          type="search"
-          placeholder="Search or add an item"
-          autocomplete="off"
-          phx-debounce="150"
-        />
+      <.form for={@search_form} id="search-form" phx-change="search" phx-submit="search" class="mt-5">
+        <div class="relative">
+          <.icon
+            name="hero-magnifying-glass"
+            class="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-base-content/45"
+          />
+          <.input
+            field={@search_form[:query]}
+            type="search"
+            placeholder="Search or add an item"
+            autocomplete="off"
+            phx-debounce="150"
+            class="h-12 w-full rounded-full border-0 bg-base-100 pr-4 pl-12 text-base shadow-card outline-none placeholder:text-base-content/45 focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
       </.form>
 
-      <div :if={show_add_prompt?(@query, @items) and is_nil(@new_form)} id="add-item" class="mt-2">
+      <div :if={show_add_prompt?(@query, @items) and is_nil(@new_form)} id="add-item" class="mb-3">
         <button
           type="button"
           phx-click="open_add"
-          class="flex w-full items-center gap-2 rounded-xl border border-dashed border-base-300 px-4 py-3 text-left font-medium text-primary transition hover:bg-base-200"
+          class="flex w-full items-center gap-3 rounded-box border-2 border-dashed border-primary/40 bg-primary/5 px-4 py-3.5 text-left font-bold text-primary transition hover:bg-primary/10 active:scale-[0.99]"
         >
-          <.icon name="hero-plus-circle" class="size-5" /> Add “{String.trim(@query)}”
+          <.icon name="hero-plus-circle" class="size-6" /> Add “{String.trim(@query)}”
         </button>
       </div>
 
@@ -195,9 +204,10 @@ defmodule KuraWeb.InventoryLive do
         id="new-item-form"
         phx-change="validate_new"
         phx-submit="create"
-        class="mt-2 space-y-1 rounded-xl border border-base-300 bg-base-200/50 p-4"
+        class="mb-3 space-y-1 rounded-box bg-base-100 p-4 shadow-card"
       >
         <.input field={@new_form[:name]} type="text" label="Name" />
+        <.input field={@new_form[:emoji]} type="text" label="Emoji (optional)" placeholder="🍎" />
         <.input
           field={@new_form[:tracking]}
           type="select"
@@ -211,47 +221,63 @@ defmodule KuraWeb.InventoryLive do
           min="1"
         />
         <div class="flex gap-2 pt-2">
-          <button type="submit" class="btn btn-primary">Add item</button>
-          <button type="button" phx-click="cancel_add" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-primary rounded-full">Add item</button>
+          <button type="button" phx-click="cancel_add" class="btn btn-ghost rounded-full">
+            Cancel
+          </button>
         </div>
       </.form>
 
       <p
         :if={@items == [] and String.trim(@query) == ""}
-        class="mt-10 text-center text-base-content/60"
+        class="mt-14 text-center text-base-content/55"
       >
+        <span class="block text-5xl">🧺</span>
+        <span class="mt-3 block font-display text-xl text-base-content">An empty basket</span>
         No items yet. Type a name above to add your first one.
       </p>
 
-      <ul id="items" class="mt-4 divide-y divide-base-300 rounded-xl border border-base-300">
-        <li :for={item <- @items} id={"item-#{item.id}"} class="px-4 py-3">
+      <ul id="items" class="mt-5 grid gap-3">
+        <li
+          :for={item <- @items}
+          id={"item-#{item.id}"}
+          class="rounded-box bg-base-100 p-3.5 shadow-card"
+        >
           <div class="flex items-center gap-3">
+            <span
+              data-role="tile"
+              class={[
+                "grid size-12 shrink-0 place-items-center rounded-2xl bg-base-300/60 text-2xl font-bold text-base-content/70",
+                item.empty? && "opacity-60 grayscale"
+              ]}
+            >
+              {tile_text(item)}
+            </span>
             <div class="min-w-0 flex-1">
-              <div class="truncate font-medium">{item.name}</div>
+              <div class="truncate text-[17px] font-bold">{item.name}</div>
               <div
                 data-role="stock"
                 class={[
                   "text-sm",
-                  item.empty? && "font-medium text-error",
-                  !item.empty? && "text-base-content/70"
+                  item.empty? && "font-bold text-error",
+                  !item.empty? && "text-base-content/60"
                 ]}
               >
                 {stock_label(item)}
               </div>
             </div>
-
-            <.stock_controls item={item} />
-
             <button
               type="button"
               phx-click="edit"
               phx-value-id={item.id}
               aria-label={"Edit #{item.name}"}
-              class="inline-flex size-10 shrink-0 items-center justify-center rounded-full text-base-content/60 transition hover:bg-base-200 hover:text-base-content"
+              class="inline-flex size-10 shrink-0 items-center justify-center rounded-full text-base-content/45 transition hover:bg-base-300/60 hover:text-base-content active:scale-95"
             >
               <.icon name="hero-pencil-square" class="size-5" />
             </button>
           </div>
+
+          <.stock_controls item={item} />
 
           <.form
             :if={@editing == item.id}
@@ -259,9 +285,15 @@ defmodule KuraWeb.InventoryLive do
             id="edit-item-form"
             phx-change="validate_edit"
             phx-submit="update"
-            class="mt-3 space-y-1 rounded-xl bg-base-200/50 p-4"
+            class="mt-3 space-y-1 rounded-2xl bg-base-200 p-4"
           >
             <.input field={@edit_form[:name]} type="text" label="Name" />
+            <.input
+              field={@edit_form[:emoji]}
+              type="text"
+              label="Emoji (optional)"
+              placeholder="🍎"
+            />
             <.input
               field={@edit_form[:usual_amount]}
               type="number"
@@ -269,13 +301,15 @@ defmodule KuraWeb.InventoryLive do
               min="1"
             />
             <div class="flex items-center gap-2 pt-2">
-              <button type="submit" class="btn btn-primary">Save</button>
-              <button type="button" phx-click="cancel_edit" class="btn btn-ghost">Cancel</button>
+              <button type="submit" class="btn btn-primary rounded-full">Save</button>
+              <button type="button" phx-click="cancel_edit" class="btn btn-ghost rounded-full">
+                Cancel
+              </button>
               <button
                 type="button"
                 phx-click="delete"
                 data-confirm={"Delete #{item.name}?"}
-                class="btn btn-ghost ml-auto text-error"
+                class="btn btn-ghost ml-auto rounded-full text-error"
               >
                 Delete
               </button>
@@ -287,11 +321,15 @@ defmodule KuraWeb.InventoryLive do
       <div
         :if={@undo}
         id="undo"
-        class="fixed inset-x-4 bottom-20 z-20 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl bg-neutral px-4 py-3 text-neutral-content shadow-lg"
+        class="fixed inset-x-4 bottom-24 z-20 mx-auto flex max-w-md items-center justify-between gap-3 rounded-box bg-neutral px-5 py-3.5 text-sm font-semibold text-neutral-content shadow-2xl"
         role="status"
       >
         <span class="truncate">{@undo.name} marked empty</span>
-        <button type="button" phx-click="undo" class="font-semibold uppercase tracking-wide">
+        <button
+          type="button"
+          phx-click="undo"
+          class="font-extrabold tracking-wider text-primary uppercase dark:text-neutral-content"
+        >
           Undo
         </button>
       </div>
@@ -303,13 +341,26 @@ defmodule KuraWeb.InventoryLive do
 
   defp stock_controls(%{item: %Item{tracking: :count}} = assigns) do
     ~H"""
-    <div class="flex shrink-0 items-center gap-1">
-      <.control phx-click="change_count" phx-value-id={@item.id} phx-value-delta="-1" label="One less">
-        <.icon name="hero-minus" class="size-5" />
-      </.control>
-      <.control phx-click="change_count" phx-value-id={@item.id} phx-value-delta="1" label="One more">
-        <.icon name="hero-plus" class="size-5" />
-      </.control>
+    <div class="mt-3 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <.round_button
+          phx-click="change_count"
+          phx-value-id={@item.id}
+          phx-value-delta="-1"
+          label="One less"
+        >
+          <.icon name="hero-minus" class="size-5" />
+        </.round_button>
+        <span class="min-w-6 text-center text-xl font-extrabold tabular-nums">{@item.stock_count}</span>
+        <.round_button
+          phx-click="change_count"
+          phx-value-id={@item.id}
+          phx-value-delta="1"
+          label="One more"
+        >
+          <.icon name="hero-plus" class="size-5" />
+        </.round_button>
+      </div>
       <.empty_button :if={!@item.empty?} item={@item} />
     </div>
     """
@@ -317,17 +368,24 @@ defmodule KuraWeb.InventoryLive do
 
   defp stock_controls(%{item: %Item{tracking: :level}} = assigns) do
     ~H"""
-    <div class="flex shrink-0 items-center gap-1">
-      <.control
-        :for={level <- [:plenty, :low]}
-        phx-click="set_level"
-        phx-value-id={@item.id}
-        phx-value-level={level}
-        active={@item.stock_level == level}
-        label={"Set #{level}"}
-      >
-        <span class="px-1 text-sm font-medium">{level |> to_string() |> String.capitalize()}</span>
-      </.control>
+    <div class="mt-3 flex items-center justify-between">
+      <div class="flex gap-0.5 rounded-full bg-base-300/60 p-[3px]">
+        <button
+          :for={level <- [:plenty, :low]}
+          type="button"
+          phx-click="set_level"
+          phx-value-id={@item.id}
+          phx-value-level={level}
+          aria-pressed={to_string(@item.stock_level == level)}
+          class={[
+            "rounded-full px-4 py-2 text-[13px] font-bold transition active:scale-95",
+            @item.stock_level == level && "bg-secondary text-secondary-content shadow-sm",
+            @item.stock_level != level && "text-base-content/60 hover:text-base-content"
+          ]}
+        >
+          {level |> to_string() |> String.capitalize()}
+        </button>
+      </div>
       <.empty_button :if={!@item.empty?} item={@item} />
     </div>
     """
@@ -341,7 +399,7 @@ defmodule KuraWeb.InventoryLive do
       type="button"
       phx-click="mark_empty"
       phx-value-id={@item.id}
-      class="inline-flex h-10 items-center rounded-full border border-error/40 px-3 text-sm font-medium text-error transition hover:bg-error/10 active:scale-95"
+      class="inline-flex h-10 items-center rounded-full bg-error/10 px-5 text-sm font-extrabold text-error transition hover:bg-error/20 active:scale-95"
     >
       Empty
     </button>
@@ -349,20 +407,15 @@ defmodule KuraWeb.InventoryLive do
   end
 
   attr :label, :string, required: true
-  attr :active, :boolean, default: false
-  attr :rest, :global, include: ~w(phx-click phx-value-id phx-value-delta phx-value-level)
+  attr :rest, :global, include: ~w(phx-click phx-value-id phx-value-delta)
   slot :inner_block, required: true
 
-  defp control(assigns) do
+  defp round_button(assigns) do
     ~H"""
     <button
       type="button"
       aria-label={@label}
-      class={[
-        "inline-flex h-10 min-w-10 items-center justify-center rounded-full transition active:scale-95",
-        @active && "bg-primary text-primary-content",
-        !@active && "bg-base-200 text-base-content hover:bg-base-300"
-      ]}
+      class="inline-flex size-10 items-center justify-center rounded-full bg-base-300/60 text-base-content transition hover:bg-base-300 active:scale-90"
       {@rest}
     >
       {render_slot(@inner_block)}

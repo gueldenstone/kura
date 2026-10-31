@@ -10,7 +10,7 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 
 ### Items (the permanent catalogue)
 - Create, rename and delete items. Items persist permanently, also when empty.
-- Each item has a tracking type:
+- Each item has an optional emoji shown as its icon (items without one show their first letter) and a tracking type:
   - **count**: a number; 0 is empty.
   - **level**: plenty / low / empty.
 

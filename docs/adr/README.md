@@ -28,3 +28,4 @@ Template:
 | [0003](0003-pwa-offline-strategy.md) | PWA with offline reads and queued check-offs | Accepted |
 | [0004](0004-username-password-auth-no-registration.md) | Username/password auth without registration | Accepted |
 | [0005](0005-item-stock-model.md) | Items with per-item stock tracking in one resource | Accepted |
+| [0006](0006-visual-design.md) | Visual design: market stall light, dark chocolate dark | Accepted |

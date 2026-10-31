@@ -33,34 +33,32 @@ defmodule KuraWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <div class="flex min-h-dvh flex-col bg-base-100 text-base-content">
-      <header class="sticky top-0 z-10 border-b border-base-300 bg-base-100/90 backdrop-blur">
-        <div class="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
-          <a href={~p"/"} class="text-lg font-semibold tracking-tight">Kura</a>
-          <div class="flex items-center gap-2">
-            <.theme_toggle />
-            <.link
-              href={~p"/sign-out"}
-              method="delete"
-              class="inline-flex size-10 items-center justify-center rounded-full text-base-content/70 transition hover:bg-base-200 hover:text-base-content"
-              aria-label={"Sign out #{@current_user.username}"}
-              title={"Sign out #{@current_user.username}"}
-            >
-              <.icon name="hero-arrow-right-start-on-rectangle" class="size-5" />
-            </.link>
-          </div>
+    <div class="flex min-h-dvh flex-col bg-base-200 text-base-content">
+      <header class="mx-auto flex h-16 w-full max-w-2xl items-center justify-between px-4 pt-[env(safe-area-inset-top)]">
+        <a href={~p"/"} class="font-display text-2xl font-bold tracking-tight text-primary">Kura</a>
+        <div class="flex items-center gap-2">
+          <.theme_toggle />
+          <.link
+            href={~p"/sign-out"}
+            method="delete"
+            class="inline-flex size-10 items-center justify-center rounded-full bg-base-300/60 text-base-content/70 transition hover:bg-base-300 hover:text-base-content active:scale-95"
+            aria-label={"Sign out #{@current_user.username}"}
+            title={"Sign out #{@current_user.username}"}
+          >
+            <.icon name="hero-arrow-right-start-on-rectangle" class="size-5" />
+          </.link>
         </div>
       </header>
 
-      <main class="mx-auto w-full max-w-2xl flex-1 px-4 pt-6 pb-28">
+      <main class="mx-auto w-full max-w-2xl flex-1 px-4 pt-2 pb-32">
         {render_slot(@inner_block)}
       </main>
 
       <nav
-        class="fixed inset-x-0 bottom-0 z-10 border-t border-base-300 bg-base-100/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        class="fixed inset-x-0 bottom-0 z-10 border-t border-base-300 bg-base-200/90 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
         aria-label="Main"
       >
-        <div class="mx-auto grid max-w-2xl grid-cols-2">
+        <div class="mx-auto grid max-w-2xl grid-cols-2 gap-2">
           <.tab href={~p"/shopping-list"} icon="hero-shopping-cart" active={@active == :shopping_list}>
             Shopping list
           </.tab>
@@ -86,9 +84,9 @@ defmodule KuraWeb.Layouts do
       navigate={@href}
       aria-current={@active && "page"}
       class={[
-        "flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition",
-        @active && "text-primary",
-        !@active && "text-base-content/60 hover:text-base-content"
+        "flex flex-col items-center gap-0.5 rounded-2xl py-2 text-xs font-bold transition active:scale-95",
+        @active && "bg-primary/10 text-primary",
+        !@active && "text-base-content/55 hover:text-base-content"
       ]}
     >
       <.icon name={@icon} class="size-6" />

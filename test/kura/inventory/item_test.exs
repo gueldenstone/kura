@@ -52,6 +52,19 @@ defmodule Kura.Inventory.ItemTest do
       assert item.stock_level == nil
     end
 
+    test "keeps an optional emoji, trimmed", %{actor: actor} do
+      assert apples(actor, %{emoji: " 🍎 "}).emoji == "🍎"
+      assert walnuts(actor).emoji == nil
+      assert walnuts(actor, %{name: "Rice", emoji: "  "}).emoji == nil
+    end
+
+    test "rejects an emoji that is really text", %{actor: actor} do
+      assert {:error, %Ash.Error.Invalid{errors: [%{field: :emoji}]}} =
+               Inventory.create_item(%{name: "Rice", tracking: :count, emoji: "rice and beans"},
+                 actor: actor
+               )
+    end
+
     test "rejects a blank name", %{actor: actor} do
       assert {:error, %Ash.Error.Invalid{}} =
                Inventory.create_item(%{name: "   ", tracking: :count}, actor: actor)
@@ -171,6 +184,13 @@ defmodule Kura.Inventory.ItemTest do
 
       assert {:error, %Ash.Error.Invalid{}} =
                Inventory.update_item(item, %{tracking: :level}, actor: actor)
+    end
+
+    test "update_item can set and clear the emoji", %{actor: actor} do
+      item = Inventory.update_item!(apples(actor), %{emoji: "🍏"}, actor: actor)
+      assert item.emoji == "🍏"
+
+      assert Inventory.update_item!(item, %{emoji: nil}, actor: actor).emoji == nil
     end
 
     test "delete_item removes the item", %{actor: actor} do
