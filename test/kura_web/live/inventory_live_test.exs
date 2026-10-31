@@ -142,6 +142,17 @@ defmodule KuraWeb.InventoryLiveTest do
       refute has_element?(view, "#new-item-form")
     end
 
+    test "opens with the emoji field focused and no example emoji", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+      view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()
+      view |> element("#add-item button") |> render_click()
+
+      emoji_input = "#new-item-form input[name='item[emoji]']"
+      assert has_element?(view, emoji_input)
+      assert render(element(view, emoji_input)) =~ "phx-mounted"
+      refute render(view) =~ ~s(placeholder="🍎")
+    end
+
     test "does not offer to add a name that exists", %{conn: conn, user: user} do
       item(user, %{name: "Walnuts"})
       {:ok, view, _html} = live(conn, ~p"/inventory")
@@ -169,6 +180,15 @@ defmodule KuraWeb.InventoryLiveTest do
       assert updated.emoji == "🍏"
       assert has_element?(view, "#item-#{apples.id}", "Green apples")
       refute has_element?(view, "#edit-item-form")
+    end
+
+    test "has no example emoji in the emoji field", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples"})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
+
+      refute render(view) =~ ~s(placeholder="🍎")
     end
 
     test "shows validation errors", %{conn: conn, user: user} do

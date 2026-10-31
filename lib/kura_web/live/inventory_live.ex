@@ -207,7 +207,14 @@ defmodule KuraWeb.InventoryLive do
         class="mb-3 space-y-1 rounded-box bg-base-100 p-4 shadow-card"
       >
         <.input field={@new_form[:name]} type="text" label="Name" />
-        <.input field={@new_form[:emoji]} type="text" label="Emoji (optional)" placeholder="🍎" />
+        <.input
+          field={@new_form[:emoji]}
+          type="text"
+          label="Emoji (optional)"
+          placeholder="Use your emoji keyboard"
+          autocomplete="off"
+          phx-mounted={JS.focus()}
+        />
         <.input
           field={@new_form[:tracking]}
           type="select"
@@ -292,7 +299,8 @@ defmodule KuraWeb.InventoryLive do
               field={@edit_form[:emoji]}
               type="text"
               label="Emoji (optional)"
-              placeholder="🍎"
+              placeholder="Use your emoji keyboard"
+              autocomplete="off"
             />
             <.input
               field={@edit_form[:usual_amount]}
