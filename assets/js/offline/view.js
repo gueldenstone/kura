@@ -7,18 +7,18 @@ const escapeHtml = text =>
   String(text).replace(/[&<>"']/g, char => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[char]))
 
 const BANNERS = {
-  offline: {icon: "hero-signal-slash", text: "Offline · changes sync when you're back", tone: "bg-neutral text-neutral-content"},
-  syncing: {icon: "hero-arrow-path", text: "Back online · syncing…", tone: "bg-secondary text-secondary-content"},
-  "signed-out": {icon: "hero-lock-closed", text: "You are signed out · sign in to sync", tone: "bg-error text-error-content"}
+  offline: {icon: "hero-signal-slash", text: "Offline", tone: "bg-neutral text-neutral-content"},
+  syncing: {icon: "hero-arrow-path", text: "Syncing…", tone: "bg-secondary text-secondary-content"},
+  "signed-out": {icon: "hero-lock-closed", text: "Signed out", tone: "bg-error text-error-content"}
 }
 
 export function banner(status, queued) {
   const {icon, text, tone} = BANNERS[status] ?? BANNERS.offline
-  const pending = queued > 0 ? `<span class="ml-auto shrink-0 rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-extrabold">${queued} to sync</span>` : ""
-  const link = status === "signed-out" ? `<a href="/sign-in" class="ml-auto shrink-0 font-extrabold underline">Sign in</a>` : ""
+  const pending = queued > 0 ? `<span class="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold">${queued}</span>` : ""
+  const link = status === "signed-out" ? `<a href="/sign-in" class="shrink-0 font-extrabold underline">Sign in</a>` : ""
 
-  return `<div role="status" class="${tone} flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold">
-    <span class="${icon} size-5 shrink-0"></span><span class="min-w-0">${text}</span>${pending}${link}</div>`
+  return `<div role="status" class="${tone} flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold">
+    <span class="${icon} size-5 shrink-0"></span><span class="min-w-0 truncate">${text}</span>${pending}${link}</div>`
 }
 
 function entryIcon(entry, dimmed) {
@@ -94,9 +94,9 @@ export function page({status, queued, tab, openCount, content}) {
     `flex flex-col items-center gap-0.5 rounded-2xl py-2 text-xs font-bold transition active:scale-95 ${active ? "bg-primary/10 text-primary" : "text-base-content/55"}`
 
   return `<div class="flex min-h-dvh flex-col bg-base-200 text-base-content">
-    <div class="pt-[env(safe-area-inset-top)]">${banner(status, queued)}</div>
-    <header class="mx-auto flex h-14 w-full max-w-2xl items-center px-4">
+    <header class="mx-auto flex min-h-16 w-full max-w-2xl items-center px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
       <span class="font-display text-2xl font-bold tracking-tight text-primary">Kura</span>
+      <div class="ml-auto">${banner(status, queued)}</div>
     </header>
     <main class="mx-auto w-full max-w-2xl flex-1 px-4 pt-1 pb-32">${content}</main>
     <nav class="fixed inset-x-0 bottom-0 z-10 border-t border-base-300 bg-base-200/90 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md" aria-label="Main">

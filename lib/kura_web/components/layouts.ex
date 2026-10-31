@@ -35,7 +35,7 @@ defmodule KuraWeb.Layouts do
   def app(assigns) do
     ~H"""
     <div class="flex min-h-dvh flex-col bg-base-200 text-base-content">
-      <header class="mx-auto flex h-16 w-full max-w-2xl items-center justify-between px-4 pt-[env(safe-area-inset-top)]">
+      <header class="mx-auto flex min-h-16 w-full max-w-2xl items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
         <a href={~p"/"} class="font-display text-2xl font-bold tracking-tight text-primary">Kura</a>
         <div class="flex items-center gap-2">
           <.theme_toggle />

@@ -58,25 +58,42 @@ async function sendQueuedChanges() {
   }
 }
 
-// When the LiveView connection is gone for good, reload: the service worker then answers the
-// navigation with the offline screens instead of the browser's error page.
+// When the LiveView connection is gone, reload: the service worker then answers the navigation
+// with the offline screens instead of the browser's error page. LiveView keeps retrying with
+// growing pauses and reports every failed attempt, so the check is scheduled once per outage and
+// not pushed back by each retry. The phone's own "offline" event starts it sooner.
 function leaveForOfflineScreensWhenDisconnected(liveSocket) {
   let timer = null
 
-  liveSocket.getSocket().onClose(() => {
-    clearTimeout(timer)
-    timer = setTimeout(async () => {
-      if (liveSocket.isConnected() || !navigator.serviceWorker?.controller) return
+  const schedule = delay => {
+    if (timer) return
+    timer = setTimeout(check, delay)
+  }
 
-      try {
-        await fetchSnapshot()
-      } catch {
-        window.location.reload()
-      }
-    }, DISCONNECT_GRACE_MS)
+  const check = async () => {
+    timer = null
+    if (liveSocket.isConnected() || !navigator.serviceWorker?.controller) return
+
+    try {
+      await fetchSnapshot()
+    } catch {
+      window.location.reload()
+    }
+  }
+
+  const socket = liveSocket.getSocket()
+  socket.onClose(() => schedule(DISCONNECT_GRACE_MS))
+  socket.onError(() => schedule(DISCONNECT_GRACE_MS))
+  socket.onOpen(() => {
+    clearTimeout(timer)
+    timer = null
   })
 
-  liveSocket.getSocket().onOpen(() => clearTimeout(timer))
+  window.addEventListener("offline", () => {
+    clearTimeout(timer)
+    timer = null
+    schedule(500)
+  })
 }
 
 function mountOfflineView(root) {
