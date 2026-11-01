@@ -234,17 +234,23 @@ defmodule KuraWeb.InventoryLiveTest do
       assert apples.stock_count == 6
     end
 
-    test "pressing enter in the search adds the name as a level item", %{conn: conn, user: user} do
+    test "pressing enter in the search opens the add form like the button", %{
+      conn: conn,
+      user: user
+    } do
       {:ok, view, _html} = live(conn, ~p"/inventory")
 
       view |> form("#search-form", search: %{query: "Walnuts"}) |> render_submit()
 
+      assert has_element?(view, "#new-item-form")
+      assert Inventory.search_items!("", actor: user) == []
+
+      view |> form("#new-item-form", item: %{tracking: "count"}) |> render_change()
+      view |> form("#new-item-form", item: %{stock_count: "3"}) |> render_submit()
+
       [walnuts] = Inventory.search_items!("", actor: user)
       assert to_string(walnuts.name) == "Walnuts"
-      assert walnuts.tracking == :level
-      assert walnuts.stock_level == :plenty
-      assert has_element?(view, "#item-#{walnuts.id}")
-      refute has_element?(view, "#add-item")
+      assert walnuts.stock_count == 3
     end
 
     test "pressing enter on an existing name adds nothing", %{conn: conn, user: user} do
@@ -253,6 +259,7 @@ defmodule KuraWeb.InventoryLiveTest do
 
       view |> form("#search-form", search: %{query: "walnuts"}) |> render_submit()
 
+      refute has_element?(view, "#new-item-form")
       assert [_one] = Inventory.search_items!("", actor: user)
     end
 

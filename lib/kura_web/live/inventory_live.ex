@@ -25,37 +25,16 @@ defmodule KuraWeb.InventoryLive do
   end
 
   def handle_event("quick_add", %{"search" => %{"query" => query}}, socket) do
-    socket = socket |> assign(query: query, new_form: nil) |> load_items()
-    name = String.trim(query)
+    socket = socket |> assign(query: query, new_form: nil) |> assign_search_form() |> load_items()
 
     if show_add_prompt?(query, socket.assigns.items) do
-      case Inventory.create_item(%{name: name, tracking: :level}, actor: actor(socket)) do
-        {:ok, _item} ->
-          {:noreply, socket |> assign(query: "") |> assign_search_form() |> load_items()}
-
-        {:error, _error} ->
-          {:noreply, put_flash(socket, :error, "Could not add “#{name}”")}
-      end
+      {:noreply, open_add_form(socket)}
     else
-      {:noreply, assign_search_form(socket)}
+      {:noreply, socket}
     end
   end
 
-  def handle_event("open_add", _params, socket) do
-    form =
-      AshPhoenix.Form.for_create(Item, :create,
-        as: "item",
-        actor: actor(socket),
-        params: %{
-          "name" => String.trim(socket.assigns.query),
-          "tracking" => "level",
-          "stock_level" => "plenty",
-          "stock_count" => "1"
-        }
-      )
-
-    {:noreply, assign(socket, new_form: to_form(form))}
-  end
+  def handle_event("open_add", _params, socket), do: {:noreply, open_add_form(socket)}
 
   def handle_event("validate_new", %{"item" => params}, socket) do
     form = AshPhoenix.Form.validate(socket.assigns.new_form.source, params)
@@ -155,6 +134,22 @@ defmodule KuraWeb.InventoryLive do
   end
 
   def handle_info(_message, socket), do: {:noreply, socket}
+
+  defp open_add_form(socket) do
+    form =
+      AshPhoenix.Form.for_create(Item, :create,
+        as: "item",
+        actor: actor(socket),
+        params: %{
+          "name" => String.trim(socket.assigns.query),
+          "tracking" => "level",
+          "stock_level" => "plenty",
+          "stock_count" => "1"
+        }
+      )
+
+    assign(socket, new_form: to_form(form))
+  end
 
   defp actor(socket), do: socket.assigns.current_user
 
