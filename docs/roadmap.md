@@ -29,7 +29,7 @@ Planned features after the MVP, in order.
 
 ## After the MVP (unordered ideas)
 
-- Locations or cupboards, so the inventory check can go through one cupboard at a time
+- Locations or cupboards, so the inventory check can go through one cupboard at a time (design notes and an open question about items in several places: `docs/locations.md`)
 - Low-stock thresholds for count items that auto-add to the list
 - Categories or store-aisle ordering of the shopping list
 - Broader history beyond check-off undo
