@@ -23,6 +23,16 @@ defmodule KuraWeb.ShoppingListLive do
     {:noreply, socket |> assign(query: query, new_form: nil) |> assign_search_form() |> load()}
   end
 
+  def handle_event("quick_add", %{"search" => %{"query" => query}}, socket) do
+    socket = socket |> assign(query: query, new_form: nil) |> assign_search_form() |> load()
+
+    if socket.assigns.show_add_prompt? do
+      handle_event("open_add", %{}, socket)
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_event("add", %{"id" => id}, socket) do
     case Inventory.get_item(id, actor: actor(socket)) do
       {:ok, item} ->
@@ -149,7 +159,13 @@ defmodule KuraWeb.ShoppingListLive do
       <h1 class="font-display text-4xl leading-none font-bold tracking-tight">Shopping list</h1>
       <p class="mt-1 text-sm text-base-content/60">{to_buy(length(@open))}</p>
 
-      <.form for={@search_form} id="search-form" phx-change="search" phx-submit="search" class="mt-4">
+      <.form
+        for={@search_form}
+        id="search-form"
+        phx-change="search"
+        phx-submit="quick_add"
+        class="mt-4"
+      >
         <div class="relative">
           <.icon
             name="hero-magnifying-glass"
