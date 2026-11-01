@@ -21,6 +21,16 @@ defmodule Kura.Inventory do
       define :mark_item_empty, action: :mark_empty
     end
 
+    resource Kura.Inventory.Tag do
+      define :create_tag, action: :create
+      define :update_tag, action: :update
+      define :delete_tag, action: :destroy
+      define :get_tag, action: :read, get_by: :id
+      define :list_tags, action: :list
+    end
+
+    resource Kura.Inventory.ItemTag
+
     resource Kura.Inventory.ShoppingEntry do
       define :add_entry, action: :add
       define :get_entry, action: :read, get_by: :id

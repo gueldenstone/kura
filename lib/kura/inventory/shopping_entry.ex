@@ -28,13 +28,13 @@ defmodule Kura.Inventory.ShoppingEntry do
     read :open do
       description "Entries still to buy, by item name."
       filter expr(is_nil(checked_at))
-      prepare build(sort: [item_name: :asc], load: [:item])
+      prepare build(sort: [item_name: :asc], load: [item: [:tags]])
     end
 
     read :checked do
       description "Entries in the cart, the most recently checked first."
       filter expr(not is_nil(checked_at))
-      prepare build(sort: [checked_at: :desc], load: [:item])
+      prepare build(sort: [checked_at: :desc], load: [item: [:tags]])
     end
 
     create :add do

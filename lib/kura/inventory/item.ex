@@ -22,12 +22,20 @@ defmodule Kura.Inventory.Item do
       primary? true
       accept [:name, :tracking, :usual_amount, :auto_replenish, :stock_count, :stock_level]
 
+      argument :tag_ids, {:array, :uuid}, constraints: [remove_nil_items?: true]
+
       change Kura.Inventory.Item.Changes.NormalizeStock
+      change Kura.Inventory.Item.Changes.SetTags
     end
 
     update :update do
       primary? true
       accept [:name, :usual_amount, :auto_replenish]
+      require_atomic? false
+
+      argument :tag_ids, {:array, :uuid}, constraints: [remove_nil_items?: true]
+
+      change Kura.Inventory.Item.Changes.SetTags
     end
 
     update :change_count do
@@ -100,22 +108,21 @@ defmodule Kura.Inventory.Item do
     end
 
     read :search do
-      description "All items by name, optionally only those whose name contains the query."
+      description "All items by name, optionally only those where every word of the query is part of the name or a tag."
 
       argument :query, :string,
         allow_nil?: false,
         default: "",
         constraints: [allow_empty?: true, trim?: false]
 
-      filter expr(contains(name, ^arg(:query)))
-
-      prepare build(sort: [name: :asc])
+      prepare build(sort: [name: :asc], load: [:tags])
+      prepare Kura.Inventory.Item.Preparations.MatchWords
     end
 
     read :to_check do
       description "All items, the ones whose stock was checked or changed longest ago first."
 
-      prepare build(sort: [stock_checked_at: :asc, name: :asc])
+      prepare build(sort: [stock_checked_at: :asc, name: :asc], load: [:tags])
     end
 
     read :by_ids do
@@ -124,7 +131,7 @@ defmodule Kura.Inventory.Item do
 
       filter expr(id in ^arg(:ids))
 
-      prepare build(sort: [name: :asc])
+      prepare build(sort: [name: :asc], load: [:tags])
     end
   end
 
@@ -184,6 +191,13 @@ defmodule Kura.Inventory.Item do
       constraints min: 1
     end
 
+    attribute :tag_key, :string do
+      description "The sorted ids of the item's tags as one string; see `Kura.Inventory.Item.Changes.SetTags`."
+      allow_nil? false
+      default ""
+      constraints allow_empty?: true, trim?: false
+    end
+
     attribute :stock_checked_at, :utc_datetime_usec do
       description "When the stock was last changed or confirmed, which is what the inventory check goes by."
       allow_nil? false
@@ -196,6 +210,12 @@ defmodule Kura.Inventory.Item do
 
   relationships do
     has_many :shopping_entries, Kura.Inventory.ShoppingEntry
+
+    many_to_many :tags, Kura.Inventory.Tag do
+      through Kura.Inventory.ItemTag
+      source_attribute_on_join_resource :item_id
+      destination_attribute_on_join_resource :tag_id
+    end
   end
 
   calculations do
@@ -210,6 +230,24 @@ defmodule Kura.Inventory.Item do
   end
 
   identities do
-    identity :unique_name, [:name], pre_check?: true
+    identity :unique_item, [:name, :tag_key],
+      pre_check?: true,
+      message: "is already in the inventory with these tags"
+  end
+
+  @doc "The string that stands for a set of tag ids in `tag_key`."
+  def tag_key(tag_ids), do: tag_ids |> Enum.map(&to_string/1) |> Enum.sort() |> Enum.join(",")
+
+  @doc "The tags of a loaded item as one line, in alphabetical order: `ground · Bio`."
+  def tag_line(%{tags: tags}) do
+    tags |> Enum.map(&to_string(&1.name)) |> Enum.sort_by(&String.downcase/1) |> Enum.join(" · ")
+  end
+
+  @doc "The name and the tags of a loaded item as one piece of text, as printed on a label."
+  def label(%{name: name} = item) do
+    case tag_line(item) do
+      "" -> to_string(name)
+      line -> "#{name} #{String.replace(line, " · ", " ")}"
+    end
   end
 end

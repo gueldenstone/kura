@@ -26,6 +26,7 @@ Planned features after the MVP, in order.
 | 7 | Label CSV export | Select inventory items and download their names as a plain CSV with the column header `Label`, for label printing | Done |
 | 8 | Optional replenishment | Per item: auto-replenish or not. Auto-replenish items go on the shopping list when marked empty; other items only get an Add to list offer in the Undo bar, since they are not regular stock | Done |
 | 9 | Inventory check mode | Each item tracks when its stock last changed. A guided mode walks through the stalest items, asks to confirm the current stock and offers a quick way to update it | Done |
+| 10 | Tags | Shared, user-extendable tags tell items apart (ADR 0010): searchable picker in the item forms, a Tags page behind a three-dots More entry in the bottom bar, tags shown under item names, in search, check cards, the shopping list and on labels | Done |
 
 ## After the MVP (unordered ideas)
 

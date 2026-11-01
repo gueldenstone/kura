@@ -25,6 +25,21 @@ defmodule KuraWeb.LabelControllerTest do
       assert disposition =~ ~s(attachment; filename="labels.csv")
     end
 
+    test "puts the tags on the label", %{conn: conn} do
+      %{conn: conn, user: user} = log_in_user(%{conn: conn})
+      ground = Inventory.create_tag!(%{name: "ground"}, actor: user)
+
+      cumin =
+        Inventory.create_item!(
+          %{name: "Cumin", tracking: :level, tag_ids: [ground.id]},
+          actor: user
+        )
+
+      conn = get(conn, ~p"/inventory/labels.csv", ids: [cumin.id])
+
+      assert response(conn, 200) == "Label\r\nCumin ground\r\n"
+    end
+
     test "ignores unknown and malformed ids", %{conn: conn} do
       %{conn: conn, user: user} = log_in_user(%{conn: conn})
       apples = Inventory.create_item!(%{name: "Apples", tracking: :count}, actor: user)

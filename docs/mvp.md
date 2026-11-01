@@ -14,6 +14,13 @@ Goal: never again be in a store unsure whether something is at home, and keep on
   - **count**: a number; 0 is empty.
   - **level**: plenty / low / empty.
 
+### Tags
+- Tags are a shared list (for example ground, whole, Usbekistan) that both users extend. An item can have any number of tags. Name plus the set of tags must be unique: "Cumin" tagged ground and "Cumin" tagged whole are two items.
+- The inventory, shopping list and check cards show the tags as a small grey line under the name. Items with the same name are ordered by their tags. Search matches the name or any tag, word by word.
+- Tags are picked in the item's add and edit forms with a searchable picker; typing a new name offers to create the tag on the spot, and Enter takes the only match. Typing "cumin ground" in the inventory search offers to add "cumin" with the tag "ground".
+- The **Tags** page (`/tags`, behind the three-dots **More** entry of the bottom bar) lists the tags with their number of items and lets you add, rename and delete them. Deleting a tag takes it off its items; it is refused when that would make two items identical.
+- The label export prints the name and the tags of each selected item on one line.
+
 ### Stock
 - View the full inventory, with the current stock of each item.
 - Adjust stock (set a count, set a level).

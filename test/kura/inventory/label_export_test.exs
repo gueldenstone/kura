@@ -3,7 +3,7 @@ defmodule Kura.Inventory.LabelExportTest do
 
   alias Kura.Inventory.LabelExport
 
-  defp csv(names), do: LabelExport.csv(Enum.map(names, &%{name: &1}))
+  defp csv(names), do: LabelExport.csv(Enum.map(names, &%{name: &1, tags: []}))
 
   test "has a Label header and one row per item" do
     assert csv(["Apples", "Walnuts"]) == "Label\r\nApples\r\nWalnuts\r\n"

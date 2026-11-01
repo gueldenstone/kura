@@ -26,7 +26,7 @@ defmodule KuraWeb.Layouts do
   attr :open_count, :integer, default: 0, doc: "open shopping list entries, shown on its tab"
 
   attr :active, :atom,
-    values: [:shopping_list, :inventory, :check],
+    values: [:shopping_list, :inventory, :check, :tags],
     required: true,
     doc: "the current tab"
 
@@ -59,7 +59,7 @@ defmodule KuraWeb.Layouts do
         class="fixed inset-x-0 bottom-0 z-10 border-t border-base-300 bg-base-200/90 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
         aria-label="Main"
       >
-        <div class="mx-auto grid max-w-2xl grid-cols-3 gap-2">
+        <div class="relative mx-auto grid max-w-2xl grid-cols-[1fr_1fr_1fr_3.5rem] gap-2">
           <.tab
             href={~p"/"}
             icon="hero-shopping-cart"
@@ -78,11 +78,51 @@ defmodule KuraWeb.Layouts do
           >
             Check
           </.tab>
+          <.more_menu active={@active == :tags} />
         </div>
       </nav>
     </div>
 
     <.flash_group flash={@flash} />
+    """
+  end
+
+  attr :active, :boolean, default: false
+
+  # The tab with the three dots: a small menu above the bar for pages that do not get a tab.
+  defp more_menu(assigns) do
+    ~H"""
+    <div class="relative">
+      <button
+        type="button"
+        id="more-button"
+        phx-click={JS.toggle(to: "#more-menu", display: "block")}
+        aria-label="More"
+        aria-haspopup="menu"
+        aria-current={@active && "page"}
+        class={[
+          "grid h-full w-full place-items-center rounded-2xl py-2 transition active:scale-95",
+          @active && "bg-primary/10 text-primary",
+          !@active && "text-base-content/55 hover:text-base-content"
+        ]}
+      >
+        <.icon name="hero-ellipsis-vertical" class="size-6" />
+      </button>
+      <div
+        id="more-menu"
+        role="menu"
+        phx-click-away={JS.hide(to: "#more-menu")}
+        class="absolute right-0 bottom-full mb-3 hidden w-48 rounded-box bg-base-100 p-1.5 shadow-2xl ring-1 ring-base-300"
+      >
+        <.link
+          navigate={~p"/tags"}
+          role="menuitem"
+          class="flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-bold transition hover:bg-base-200 active:scale-[0.98]"
+        >
+          <.icon name="hero-tag" class="size-5 text-base-content/60" /> Tags
+        </.link>
+      </div>
+    </div>
     """
   end
 

@@ -55,7 +55,7 @@ defmodule Kura.Offline do
   defp item(item) do
     %{
       id: item.id,
-      name: to_string(item.name),
+      name: Kura.Inventory.Item.label(item),
       tracking: to_string(item.tracking),
       stock_count: item.stock_count,
       stock_level: item.stock_level && to_string(item.stock_level),
@@ -69,7 +69,7 @@ defmodule Kura.Offline do
     %{
       id: entry.id,
       item_id: entry.item_id,
-      name: to_string(entry.item.name),
+      name: Kura.Inventory.Item.label(entry.item),
       quantity: entry.quantity,
       checked_at: entry.checked_at && DateTime.to_iso8601(entry.checked_at)
     }

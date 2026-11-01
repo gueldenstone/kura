@@ -10,7 +10,7 @@ defmodule Kura.Inventory.LabelExport do
 
   @spec csv([Item.t()]) :: String.t()
   def csv(items) do
-    Enum.map_join([@header | Enum.map(items, &to_string(&1.name))], "\r\n", &field/1) <> "\r\n"
+    Enum.map_join([@header | Enum.map(items, &Item.label/1)], "\r\n", &field/1) <> "\r\n"
   end
 
   defp field(value) do

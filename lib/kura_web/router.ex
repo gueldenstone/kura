@@ -35,6 +35,7 @@ defmodule KuraWeb.Router do
       live "/", ShoppingListLive
       live "/inventory", InventoryLive
       live "/inventory/check", InventoryLive, :check
+      live "/tags", TagsLive
     end
   end
 
