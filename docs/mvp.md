@@ -10,7 +10,7 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 
 ### Items (the permanent catalogue)
 - Create, rename and delete items. Items persist permanently, also when empty.
-- Each item has an optional emoji shown as its icon (items without one show their first letter) and a tracking type:
+- Each item has a name and a tracking type (items have no icon):
   - **count**: a number; 0 is empty.
   - **level**: plenty / low / empty.
 
@@ -18,6 +18,7 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 - View the full inventory, with the current stock of each item.
 - Adjust stock (set a count, set a level).
 - **Mark empty** in one tap; this adds the item to the shopping list with its usual amount (unless it is already on the list). Undo takes the entry off again.
+- Each inventory row is one line: the name (tap to edit) and one stock control. Level items use a Plenty / Low / Empty selector, count items a minus / number / plus stepper next to a separate Empty button; stepping a count down to 0 also marks it empty.
 - Items that are on the list carry a small cart marker in the inventory.
 
 ### Shopping list

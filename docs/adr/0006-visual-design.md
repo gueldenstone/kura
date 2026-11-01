@@ -11,7 +11,7 @@ The first inventory screen looked generic. The owner wants an app that feels app
 - **Dark theme:** the dark chocolate direction (brown surfaces, caramel primary), selected through the existing theme toggle.
 - Colours live in the two daisyUI theme blocks in `assets/css/app.css`; components use the theme tokens (`bg-base-100`, `text-primary`, ...) and never hard-code colours, so both themes work everywhere.
 - Fonts: Fraunces (display) and DM Sans (body), bundled as variable woff2 files in `priv/static/fonts`, not loaded from a CDN, so they also work offline.
-- Items show an emoji tile (optional field on the item) or their first letter.
+- Items show an emoji tile (optional field on the item) or their first letter. Amended: the tile and the emoji field were removed. Inventory rows are single-line cards with one combined stock control, and the shopping list shows names only.
 - Layout: mobile-first cards with large touch targets (at least 40px), bottom tab bar, pill shapes. daisyUI is used only for its theme tokens and basic form styling; app components are hand-written Tailwind.
 - The `ash_authentication_phoenix` sign-in and sign-out pages are restyled through `KuraWeb.AuthOverrides`.
 

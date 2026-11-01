@@ -24,7 +24,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
   end
 
   test "lists open entries by item name with their quantity", %{conn: conn, user: user} do
-    walnuts = item(user, %{name: "Walnuts", emoji: "🌰", tracking: :level})
+    walnuts = item(user, %{name: "Walnuts", tracking: :level})
     apples = item(user, %{name: "Apples", usual_amount: 6})
     on_list(user, walnuts)
     entry = on_list(user, apples)
@@ -151,7 +151,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
       view |> element("#add-item button") |> render_click()
 
       view
-      |> form("#new-item-form", item: %{tracking: "level", usual_amount: "2", emoji: "🌰"})
+      |> form("#new-item-form", item: %{tracking: "level", usual_amount: "2"})
       |> render_submit()
 
       [entry] = Inventory.list_open_entries!(actor: user)

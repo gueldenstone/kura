@@ -176,7 +176,6 @@ defmodule KuraWeb.ShoppingListLive do
           id={"suggestion-#{item.id}"}
           class="flex items-center gap-3 border-b border-base-300 p-2.5 last:border-b-0"
         >
-          <.item_tile item={item} />
           <div class="min-w-0 flex-1">
             <div class="truncate font-bold">{item.name}</div>
             <div class="text-sm text-base-content/60">usual amount {item.usual_amount}</div>
@@ -227,10 +226,7 @@ defmodule KuraWeb.ShoppingListLive do
             aria-label={"Check off #{entry.item.name}"}
             class="size-11 shrink-0 rounded-full border-[2.5px] border-primary/55 transition hover:bg-primary/10 active:scale-90"
           />
-          <span class="flex min-w-0 flex-1 items-center gap-2 text-[17px] font-bold">
-            <.entry_icon item={entry.item} />
-            <span class="truncate">{entry.item.name}</span>
-          </span>
+          <span class="min-w-0 flex-1 truncate text-[17px] font-bold">{entry.item.name}</span>
           <div class="flex shrink-0 items-center gap-1">
             <button
               type="button"
@@ -298,35 +294,14 @@ defmodule KuraWeb.ShoppingListLive do
             >
               <.icon name="hero-check" class="size-6" />
             </button>
-            <span class="flex min-w-0 flex-1 items-center gap-2 text-[17px] font-bold text-base-content/55">
-              <.entry_icon item={entry.item} dimmed />
-              <span class="truncate line-through decoration-[1.5px]">{entry.item.name}</span>
+            <span class="min-w-0 flex-1 truncate text-[17px] font-bold text-base-content/55 line-through decoration-[1.5px]">
+              {entry.item.name}
             </span>
             <span class="font-bold text-base-content/55 tabular-nums">× {entry.quantity}</span>
           </li>
         </ul>
       </section>
     </Layouts.app>
-    """
-  end
-
-  attr :item, :map, required: true
-  attr :dimmed, :boolean, default: false
-
-  defp entry_icon(%{item: %{emoji: emoji}} = assigns) when is_binary(emoji) do
-    ~H"""
-    <span class={["text-2xl", @dimmed && "opacity-70 grayscale"]}>{@item.emoji}</span>
-    """
-  end
-
-  defp entry_icon(assigns) do
-    ~H"""
-    <span class={[
-      "grid size-7 shrink-0 place-items-center rounded-full bg-base-300/60 text-sm font-bold text-base-content/70",
-      @dimmed && "opacity-70"
-    ]}>
-      {tile_text(@item)}
-    </span>
     """
   end
 end

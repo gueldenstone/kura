@@ -15,7 +15,7 @@
 -->
 <pre id="out"></pre>
 <script type="module">
-  import {toggleChange, applyQueue, stockLabel, tileText, matches} from "../../assets/js/offline/state.js"
+  import {toggleChange, applyQueue, matches} from "../../assets/js/offline/state.js"
 
   const out = document.getElementById("out")
   let failed = 0
@@ -30,15 +30,15 @@
   const snapshot = () => ({
     generated_at: "2026-10-31T10:00:00Z",
     items: [
-      {id: "i1", name: "Apples", emoji: "🍎", tracking: "count", stock_count: 0, stock_level: null, empty: true, on_list: true},
-      {id: "i2", name: "Walnuts", emoji: null, tracking: "level", stock_count: null, stock_level: "empty", empty: true, on_list: true},
-      {id: "i3", name: "Rice", emoji: null, tracking: "level", stock_count: null, stock_level: "plenty", empty: false, on_list: false}
+      {id: "i1", name: "Apples", tracking: "count", stock_count: 0, stock_level: null, empty: true, on_list: true},
+      {id: "i2", name: "Walnuts", tracking: "level", stock_count: null, stock_level: "empty", empty: true, on_list: true},
+      {id: "i3", name: "Rice", tracking: "level", stock_count: null, stock_level: "plenty", empty: false, on_list: false}
     ],
     open: [
-      {id: "e1", item_id: "i1", name: "Apples", emoji: "🍎", quantity: 6, checked_at: null},
-      {id: "e2", item_id: "i2", name: "Walnuts", emoji: null, quantity: 1, checked_at: null}
+      {id: "e1", item_id: "i1", name: "Apples", quantity: 6, checked_at: null},
+      {id: "e2", item_id: "i2", name: "Walnuts", quantity: 1, checked_at: null}
     ],
-    checked: [{id: "e3", item_id: "i3", name: "Rice", emoji: null, quantity: 1, checked_at: "2026-10-31T09:00:00Z"}]
+    checked: [{id: "e3", item_id: "i3", name: "Rice", quantity: 1, checked_at: "2026-10-31T09:00:00Z"}]
   })
 
   test("toggleChange queues a check-off", () => {
@@ -81,7 +81,7 @@
   })
   test("uncheck never takes a count below zero", () => {
     const base = snapshot()
-    base.checked.push({id: "e5", item_id: "i1", name: "Apples", emoji: "🍎", quantity: 6, checked_at: "2026-10-31T09:30:00Z"})
+    base.checked.push({id: "e5", item_id: "i1", name: "Apples", quantity: 6, checked_at: "2026-10-31T09:30:00Z"})
     const apples = applyQueue(base, [{op: "uncheck", entry_id: "e5"}]).items.find(i => i.id === "i1")
     same([apples.stock_count, apples.empty], [0, true])
   })
@@ -99,17 +99,6 @@
     same(result, snapshot())
   })
 
-  test("stockLabel", () => {
-    const [apples, walnuts, rice] = snapshot().items
-    same(stockLabel(apples), "Empty")
-    same(stockLabel({...apples, empty: false, stock_count: 3}), "3 in stock")
-    same(stockLabel({...walnuts, empty: false, stock_level: "low"}), "Running low")
-    same(stockLabel(rice), "Plenty")
-  })
-  test("tileText falls back to the first letter", () => {
-    const [apples, , rice] = snapshot().items
-    same([tileText(apples), tileText(rice)], ["🍎", "R"])
-  })
   test("matches ignores case and surrounding spaces", () => {
     const [, walnuts] = snapshot().items
     same([matches(walnuts, " ALN "), matches(walnuts, "zz"), matches(walnuts, "")], [true, false, true])

@@ -27,17 +27,24 @@ defmodule KuraWeb.InventoryLiveTest do
 
     assert :binary.match(html, "Apples") < :binary.match(html, "Walnuts")
     assert has_element?(view, "#item-#{apples.id} [data-role=stock]", "3")
-    assert has_element?(view, "#item-#{walnuts.id} [data-role=stock]", "Running low")
+
+    assert has_element?(
+             view,
+             "#item-#{walnuts.id} [data-role=stock] button[aria-pressed=true]",
+             "Low"
+           )
   end
 
-  test "each item shows its emoji, or its first letter without one", %{conn: conn, user: user} do
-    apples = item(user, %{name: "apples", emoji: "🍎"})
-    rice = item(user, %{name: "Rice"})
+  test "an item is one compact row: its name and one stock control, no icon tile", %{
+    conn: conn,
+    user: user
+  } do
+    apples = item(user, %{name: "apples"})
 
     {:ok, view, _html} = live(conn, ~p"/inventory")
 
-    assert has_element?(view, "#item-#{apples.id} [data-role=tile]", "🍎")
-    assert has_element?(view, "#item-#{rice.id} [data-role=tile]", "R")
+    refute has_element?(view, "#item-#{apples.id} [data-role=tile]")
+    assert has_element?(view, "#item-#{apples.id} [data-role=stock]")
   end
 
   test "search filters the list as you type", %{conn: conn, user: user} do
@@ -54,18 +61,18 @@ defmodule KuraWeb.InventoryLiveTest do
 
   describe "marking empty" do
     test "empties a count item and can be undone", %{conn: conn, user: user} do
-      apples = item(user, %{name: "Apples", stock_count: 4})
+      apples = item(user, %{name: "Apples", stock_count: 1})
       {:ok, view, _html} = live(conn, ~p"/inventory")
 
-      view |> element("#item-#{apples.id} button[phx-click=mark_empty]") |> render_click()
+      view |> element("#item-#{apples.id} button[aria-label='One less']") |> render_click()
 
       assert stored(user, apples).stock_count == 0
-      assert has_element?(view, "#item-#{apples.id} [data-role=stock]", "Empty")
+      assert has_element?(view, "#item-#{apples.id} button[phx-click=mark_empty][disabled]")
       assert has_element?(view, "#undo", "Apples")
 
       view |> element("#undo button") |> render_click()
 
-      assert stored(user, apples).stock_count == 4
+      assert stored(user, apples).stock_count == 1
       refute has_element?(view, "#undo")
     end
 
@@ -80,11 +87,36 @@ defmodule KuraWeb.InventoryLiveTest do
       assert stored(user, walnuts).stock_level == :low
     end
 
-    test "an already empty item has no empty button", %{conn: conn, user: user} do
+    test "an already empty item cannot be marked empty or stepped down again", %{
+      conn: conn,
+      user: user
+    } do
+      apples = item(user, %{name: "Apples", stock_count: 0})
+      walnuts = item(user, %{name: "Walnuts", tracking: :level, stock_level: :empty})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      assert has_element?(view, "#item-#{apples.id} button[aria-label='One less'][disabled]")
+      assert has_element?(view, "#item-#{apples.id} button[phx-click=mark_empty][disabled]")
+      assert has_element?(view, "#item-#{walnuts.id} button[phx-click=mark_empty][disabled]")
+    end
+
+    test "the Empty button marks a count item empty in one tap", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples", stock_count: 5})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[phx-click=mark_empty]") |> render_click()
+
+      assert stored(user, apples).stock_count == 0
+      assert [_entry] = Inventory.list_open_entries!(actor: user)
+    end
+
+    test "stepping a count up from empty restocks it", %{conn: conn, user: user} do
       apples = item(user, %{name: "Apples", stock_count: 0})
       {:ok, view, _html} = live(conn, ~p"/inventory")
 
-      refute has_element?(view, "#item-#{apples.id} button[phx-click=mark_empty]")
+      view |> element("#item-#{apples.id} button[aria-label='One more']") |> render_click()
+
+      assert stored(user, apples).stock_count == 1
     end
   end
 
@@ -111,10 +143,10 @@ defmodule KuraWeb.InventoryLiveTest do
       conn: conn,
       user: user
     } do
-      apples = item(user, %{name: "Apples", stock_count: 2, usual_amount: 6})
+      apples = item(user, %{name: "Apples", stock_count: 1, usual_amount: 6})
       {:ok, view, _html} = live(conn, ~p"/inventory")
 
-      view |> element("#item-#{apples.id} button[phx-click=mark_empty]") |> render_click()
+      view |> element("#item-#{apples.id} button[aria-label='One less']") |> render_click()
 
       assert [%{quantity: 6}] = Inventory.list_open_entries!(actor: user)
       assert has_element?(view, "#item-#{apples.id} [data-role=on-list]")
@@ -137,10 +169,10 @@ defmodule KuraWeb.InventoryLiveTest do
     end
 
     test "the Shopping list tab shows how many entries are open", %{conn: conn, user: user} do
-      apples = item(user, %{name: "Apples"})
+      apples = item(user, %{name: "Apples", stock_count: 1})
       {:ok, view, _html} = live(conn, ~p"/inventory")
 
-      view |> element("#item-#{apples.id} button[phx-click=mark_empty]") |> render_click()
+      view |> element("#item-#{apples.id} button[aria-label='One less']") |> render_click()
 
       assert has_element?(view, "nav [data-role=open-count]", "1")
     end
@@ -152,7 +184,7 @@ defmodule KuraWeb.InventoryLiveTest do
 
     Inventory.set_item_count!(apples, 9, actor: user)
 
-    assert has_element?(view, "#item-#{apples.id} [data-role=stock]", "9 in stock")
+    assert has_element?(view, "#item-#{apples.id} [data-role=stock]", "9")
   end
 
   test "plus and minus change a count", %{conn: conn, user: user} do
@@ -179,7 +211,12 @@ defmodule KuraWeb.InventoryLiveTest do
     |> render_click()
 
     assert stored(user, walnuts).stock_level == :low
-    assert has_element?(view, "#item-#{walnuts.id} [data-role=stock]", "Running low")
+
+    assert has_element?(
+             view,
+             "#item-#{walnuts.id} [data-role=stock] button[aria-pressed=true]",
+             "Low"
+           )
   end
 
   describe "adding items" do
@@ -197,14 +234,13 @@ defmodule KuraWeb.InventoryLiveTest do
       view |> element("#add-item button") |> render_click()
 
       view
-      |> form("#new-item-form", item: %{tracking: "level", usual_amount: "2", emoji: "🌰"})
+      |> form("#new-item-form", item: %{tracking: "level", usual_amount: "2"})
       |> render_submit()
 
       [walnuts] = Inventory.search_items!("", actor: user)
       assert to_string(walnuts.name) == "Walnuts"
       assert walnuts.tracking == :level
       assert walnuts.usual_amount == 2
-      assert walnuts.emoji == "🌰"
       assert has_element?(view, "#item-#{walnuts.id}")
       refute has_element?(view, "#new-item-form")
     end
@@ -263,17 +299,6 @@ defmodule KuraWeb.InventoryLiveTest do
       assert [_one] = Inventory.search_items!("", actor: user)
     end
 
-    test "opens with the emoji field focused and no example emoji", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/inventory")
-      view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()
-      view |> element("#add-item button") |> render_click()
-
-      emoji_input = "#new-item-form input[name='item[emoji]']"
-      assert has_element?(view, emoji_input)
-      assert render(element(view, emoji_input)) =~ "phx-mounted"
-      refute render(view) =~ ~s(placeholder="🍎")
-    end
-
     test "does not offer to add a name that exists", %{conn: conn, user: user} do
       item(user, %{name: "Walnuts"})
       {:ok, view, _html} = live(conn, ~p"/inventory")
@@ -292,24 +317,26 @@ defmodule KuraWeb.InventoryLiveTest do
       view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
 
       view
-      |> form("#edit-item-form", item: %{name: "Green apples", usual_amount: "4", emoji: "🍏"})
+      |> form("#edit-item-form", item: %{name: "Green apples", usual_amount: "4"})
       |> render_submit()
 
       updated = stored(user, apples)
       assert to_string(updated.name) == "Green apples"
       assert updated.usual_amount == 4
-      assert updated.emoji == "🍏"
       assert has_element?(view, "#item-#{apples.id}", "Green apples")
       refute has_element?(view, "#edit-item-form")
     end
 
-    test "has no example emoji in the emoji field", %{conn: conn, user: user} do
+    test "tapping the name of an open card closes it again", %{conn: conn, user: user} do
       apples = item(user, %{name: "Apples"})
       {:ok, view, _html} = live(conn, ~p"/inventory")
+      edit = "#item-#{apples.id} button[phx-click=edit]"
 
-      view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
+      view |> element(edit) |> render_click()
+      assert has_element?(view, "#edit-item-form")
 
-      refute render(view) =~ ~s(placeholder="🍎")
+      view |> element(edit) |> render_click()
+      refute has_element?(view, "#edit-item-form")
     end
 
     test "shows validation errors", %{conn: conn, user: user} do

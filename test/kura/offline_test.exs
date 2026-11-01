@@ -22,7 +22,7 @@ defmodule Kura.OfflineTest do
     test "describes the inventory and the shopping list in plain, JSON-friendly data", %{
       actor: actor
     } do
-      apples = item(actor, %{name: "Apples", emoji: "🍎", stock_count: 0, usual_amount: 6})
+      apples = item(actor, %{name: "Apples", stock_count: 0, usual_amount: 6})
       walnuts = item(actor, %{name: "Walnuts", tracking: :level, stock_level: :low})
       rice = item(actor, %{name: "Rice", tracking: :level})
       entry = on_list(actor, apples)
@@ -35,7 +35,6 @@ defmodule Kura.OfflineTest do
       assert [
                %{
                  name: "Apples",
-                 emoji: "🍎",
                  tracking: "count",
                  stock_count: 0,
                  empty: true,
@@ -43,7 +42,6 @@ defmodule Kura.OfflineTest do
                },
                %{
                  name: "Rice",
-                 emoji: nil,
                  tracking: "level",
                  stock_level: "plenty",
                  on_list: false
@@ -54,7 +52,6 @@ defmodule Kura.OfflineTest do
                  snapshot.items,
                  &Map.take(&1, [
                    :name,
-                   :emoji,
                    :tracking,
                    :stock_count,
                    :stock_level,
@@ -63,7 +60,7 @@ defmodule Kura.OfflineTest do
                  ])
                )
 
-      assert [%{id: entry_id, item_id: apples_id, name: "Apples", emoji: "🍎", quantity: 6}] =
+      assert [%{id: entry_id, item_id: apples_id, name: "Apples", quantity: 6}] =
                snapshot.open
 
       assert entry_id == entry.id

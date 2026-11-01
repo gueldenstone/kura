@@ -93,14 +93,6 @@ export function applyQueue(snapshot, queue) {
   return result
 }
 
-export function stockLabel(item) {
-  if (item.empty) return "Empty"
-  if (item.tracking === "count") return `${item.stock_count} in stock`
-  return item.stock_level === "low" ? "Running low" : "Plenty"
-}
-
-export const tileText = item => item.emoji || (item.name[0] || "?").toUpperCase()
-
 export function matches(item, query) {
   return item.name.toLowerCase().includes(query.trim().toLowerCase())
 }

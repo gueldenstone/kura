@@ -56,6 +56,10 @@ defmodule KuraWeb.InventoryLive do
     {:noreply, assign(socket, new_form: nil)}
   end
 
+  def handle_event("edit", %{"id" => id}, %{assigns: %{editing: id}} = socket) do
+    {:noreply, assign(socket, editing: nil, edit_form: nil)}
+  end
+
   def handle_event("edit", %{"id" => id}, socket) do
     with_item(socket, id, fn item ->
       form = AshPhoenix.Form.for_update(item, :update, as: "item", actor: actor(socket))
@@ -91,8 +95,20 @@ defmodule KuraWeb.InventoryLive do
 
   def handle_event("change_count", %{"id" => id, "delta" => delta}, socket) do
     with_item(socket, id, fn item ->
-      Inventory.change_item_count!(item, String.to_integer(delta), actor: actor(socket))
-      {:noreply, load_items(socket)}
+      delta = String.to_integer(delta)
+
+      cond do
+        # Stepping down to 0 is the same as marking the item empty.
+        delta < 0 and item.stock_count > 0 and item.stock_count + delta <= 0 ->
+          mark_empty(socket, item)
+
+        delta < 0 and item.stock_count == 0 ->
+          {:noreply, socket}
+
+        true ->
+          Inventory.change_item_count!(item, delta, actor: actor(socket))
+          {:noreply, load_items(socket)}
+      end
     end)
   end
 
@@ -104,18 +120,7 @@ defmodule KuraWeb.InventoryLive do
   end
 
   def handle_event("mark_empty", %{"id" => id}, socket) do
-    with_item(socket, id, fn item ->
-      marked = Inventory.mark_item_empty!(item, actor: actor(socket))
-
-      undo = %{
-        id: item.id,
-        name: item.name,
-        previous: previous_stock(item),
-        added_entry: marked.__metadata__.added_entry
-      }
-
-      {:noreply, socket |> assign(undo: undo) |> load_items()}
-    end)
+    with_item(socket, id, &mark_empty(socket, &1))
   end
 
   def handle_event("undo", _params, %{assigns: %{undo: %{} = undo}} = socket) do
@@ -182,6 +187,19 @@ defmodule KuraWeb.InventoryLive do
     end
   end
 
+  defp mark_empty(socket, item) do
+    marked = Inventory.mark_item_empty!(item, actor: actor(socket))
+
+    undo = %{
+      id: item.id,
+      name: item.name,
+      previous: previous_stock(item),
+      added_entry: marked.__metadata__.added_entry
+    }
+
+    {:noreply, socket |> assign(undo: undo) |> load_items()}
+  end
+
   defp previous_stock(%Item{tracking: :count, stock_count: count}), do: {:count, count}
   defp previous_stock(%Item{tracking: :level, stock_level: level}), do: {:level, level}
 
@@ -205,11 +223,6 @@ defmodule KuraWeb.InventoryLive do
     name = query |> String.trim() |> String.downcase()
     name != "" and not Enum.any?(items, &(String.downcase(to_string(&1.name)) == name))
   end
-
-  defp stock_label(%Item{empty?: true}), do: "Empty"
-  defp stock_label(%Item{tracking: :count, stock_count: count}), do: "#{count} in stock"
-  defp stock_label(%Item{stock_level: :low}), do: "Running low"
-  defp stock_label(%Item{stock_level: :plenty}), do: "Plenty"
 
   @impl true
   def render(assigns) do
@@ -266,39 +279,37 @@ defmodule KuraWeb.InventoryLive do
         No items yet. Type a name above to add your first one.
       </p>
 
-      <ul id="items" class="mt-5 grid grid-cols-1 gap-3">
+      <ul id="items" class="mt-5 grid grid-cols-1 gap-2.5">
         <li
           :for={item <- @items}
           id={"item-#{item.id}"}
-          class="rounded-box bg-base-100 p-3.5 shadow-card"
+          class="rounded-box bg-base-100 py-2 pr-2.5 pl-4 shadow-card"
         >
           <div class="flex items-center gap-3">
-            <.item_tile item={item} dimmed={item.empty?} on_list={item.on_list?} />
-            <div class="min-w-0 flex-1">
-              <div class="truncate text-[17px] font-bold">{item.name}</div>
-              <div
-                data-role="stock"
-                class={[
-                  "text-sm",
-                  item.empty? && "font-bold text-error",
-                  !item.empty? && "text-base-content/60"
-                ]}
-              >
-                {stock_label(item)}
-              </div>
-            </div>
             <button
               type="button"
               phx-click="edit"
               phx-value-id={item.id}
               aria-label={"Edit #{item.name}"}
-              class="inline-flex size-10 shrink-0 items-center justify-center rounded-full text-base-content/45 transition hover:bg-base-300/60 hover:text-base-content active:scale-95"
+              class="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1.5 text-left transition active:opacity-70"
             >
-              <.icon name="hero-pencil-square" class="size-5" />
+              <span class={[
+                "truncate text-[17px] font-bold",
+                item.empty? && "text-base-content/60"
+              ]}>
+                {item.name}
+              </span>
+              <span
+                :if={item.on_list?}
+                data-role="on-list"
+                title="On the shopping list"
+                class="grid size-[22px] shrink-0 place-items-center rounded-full bg-primary text-primary-content"
+              >
+                <.icon name="hero-shopping-cart-solid" class="size-2.5" />
+              </span>
             </button>
+            <.stock_control item={item} />
           </div>
-
-          <.stock_controls item={item} />
 
           <.form
             :if={@editing == item.id}
@@ -309,13 +320,6 @@ defmodule KuraWeb.InventoryLive do
             class="mt-3 space-y-1 rounded-2xl bg-base-200 p-4"
           >
             <.input field={@edit_form[:name]} type="text" label="Name" />
-            <.input
-              field={@edit_form[:emoji]}
-              type="text"
-              label="Emoji (optional)"
-              placeholder="Use your emoji keyboard"
-              autocomplete="off"
-            />
             <.input
               field={@edit_form[:usual_amount]}
               type="number"
@@ -361,19 +365,25 @@ defmodule KuraWeb.InventoryLive do
 
   attr :item, Item, required: true
 
-  defp stock_controls(%{item: %Item{tracking: :count}} = assigns) do
+  defp stock_control(%{item: %Item{tracking: :count}} = assigns) do
     ~H"""
-    <div class="mt-3 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
+    <div data-role="stock" class="flex shrink-0 items-center gap-1.5">
+      <div class="flex items-center rounded-full bg-base-300/60 p-[3px]">
         <.round_button
           phx-click="change_count"
           phx-value-id={@item.id}
           phx-value-delta="-1"
           label="One less"
+          disabled={@item.empty?}
         >
           <.icon name="hero-minus" class="size-5" />
         </.round_button>
-        <span class="min-w-6 text-center text-xl font-extrabold tabular-nums">{@item.stock_count}</span>
+        <span class={[
+          "min-w-8 text-center text-lg font-extrabold tabular-nums",
+          @item.empty? && "text-error"
+        ]}>
+          {@item.stock_count}
+        </span>
         <.round_button
           phx-click="change_count"
           phx-value-id={@item.id}
@@ -383,32 +393,30 @@ defmodule KuraWeb.InventoryLive do
           <.icon name="hero-plus" class="size-5" />
         </.round_button>
       </div>
-      <.empty_button :if={!@item.empty?} item={@item} />
+      <.empty_button item={@item} />
     </div>
     """
   end
 
-  defp stock_controls(%{item: %Item{tracking: :level}} = assigns) do
+  defp stock_control(%{item: %Item{tracking: :level}} = assigns) do
     ~H"""
-    <div class="mt-3 flex items-center justify-between">
-      <div class="flex gap-0.5 rounded-full bg-base-300/60 p-[3px]">
-        <button
-          :for={level <- [:plenty, :low]}
-          type="button"
-          phx-click="set_level"
-          phx-value-id={@item.id}
-          phx-value-level={level}
-          aria-pressed={to_string(@item.stock_level == level)}
-          class={[
-            "rounded-full px-4 py-2 text-[13px] font-bold transition active:scale-95",
-            @item.stock_level == level && "bg-secondary text-secondary-content shadow-sm",
-            @item.stock_level != level && "text-base-content/60 hover:text-base-content"
-          ]}
-        >
-          {level |> to_string() |> String.capitalize()}
-        </button>
-      </div>
-      <.empty_button :if={!@item.empty?} item={@item} />
+    <div data-role="stock" class="flex shrink-0 gap-0.5 rounded-full bg-base-300/60 p-[3px]">
+      <button
+        :for={{level, label, tone} <- level_options()}
+        type="button"
+        phx-click={if level == :empty, do: "mark_empty", else: "set_level"}
+        phx-value-id={@item.id}
+        phx-value-level={level}
+        aria-pressed={to_string(@item.stock_level == level)}
+        disabled={@item.stock_level == level}
+        class={[
+          "h-9 rounded-full px-3 text-[13px] font-bold transition active:scale-95",
+          @item.stock_level == level && tone,
+          @item.stock_level != level && "text-base-content/60 hover:text-base-content"
+        ]}
+      >
+        {label}
+      </button>
     </div>
     """
   end
@@ -421,15 +429,28 @@ defmodule KuraWeb.InventoryLive do
       type="button"
       phx-click="mark_empty"
       phx-value-id={@item.id}
-      class="inline-flex h-10 items-center rounded-full bg-error/10 px-5 text-sm font-extrabold text-error transition hover:bg-error/20 active:scale-95"
+      disabled={@item.empty?}
+      class={[
+        "h-9 rounded-full px-3 text-[13px] font-bold transition active:scale-95",
+        !@item.empty? && "bg-error/10 text-error hover:bg-error/20",
+        @item.empty? && "bg-error text-error-content shadow-sm"
+      ]}
     >
       Empty
     </button>
     """
   end
 
+  defp level_options do
+    [
+      {:plenty, "Plenty", "bg-success text-success-content shadow-sm"},
+      {:low, "Low", "bg-warning text-warning-content shadow-sm"},
+      {:empty, "Empty", "bg-error text-error-content shadow-sm"}
+    ]
+  end
+
   attr :label, :string, required: true
-  attr :rest, :global, include: ~w(phx-click phx-value-id phx-value-delta)
+  attr :rest, :global, include: ~w(phx-click phx-value-id phx-value-delta disabled)
   slot :inner_block, required: true
 
   defp round_button(assigns) do
@@ -437,7 +458,7 @@ defmodule KuraWeb.InventoryLive do
     <button
       type="button"
       aria-label={@label}
-      class="inline-flex size-10 items-center justify-center rounded-full bg-base-300/60 text-base-content transition hover:bg-base-300 active:scale-90"
+      class="inline-flex size-9 items-center justify-center rounded-full text-base-content transition hover:bg-base-300 active:scale-90 disabled:pointer-events-none disabled:opacity-30"
       {@rest}
     >
       {render_slot(@inner_block)}

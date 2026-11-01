@@ -20,14 +20,14 @@ defmodule Kura.Inventory.Item do
 
     create :create do
       primary? true
-      accept [:name, :emoji, :tracking, :usual_amount, :stock_count, :stock_level]
+      accept [:name, :tracking, :usual_amount, :stock_count, :stock_level]
 
       change Kura.Inventory.Item.Changes.NormalizeStock
     end
 
     update :update do
       primary? true
-      accept [:name, :emoji, :usual_amount]
+      accept [:name, :usual_amount]
     end
 
     update :change_count do
@@ -123,12 +123,6 @@ defmodule Kura.Inventory.Item do
       allow_nil? false
       public? true
       constraints min_length: 1, trim?: true
-    end
-
-    attribute :emoji, :string do
-      description "An emoji shown as the item's icon. Items without one show their first letter."
-      public? true
-      constraints max_length: 4, trim?: true, allow_empty?: false
     end
 
     attribute :tracking, :atom do
