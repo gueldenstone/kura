@@ -34,8 +34,10 @@ defmodule KuraWeb.Router do
       on_mount: [{KuraWeb.LiveUserAuth, :live_user_required}, KuraWeb.LiveKitchenSync] do
       live "/", ShoppingListLive
       live "/inventory", InventoryLive
-      live "/inventory/check", InventoryLive, :check
+      live "/inventory/check", InventoryLive, :check_pick
+      live "/inventory/check/:scope", InventoryLive, :check
       live "/tags", TagsLive
+      live "/locations", LocationsLive
     end
   end
 

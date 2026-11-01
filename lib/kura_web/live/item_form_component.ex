@@ -13,10 +13,12 @@ defmodule KuraWeb.ItemFormComponent do
   """
   use KuraWeb, :live_component
 
-  import KuraWeb.InventoryComponents, only: [tag_picker: 1]
+  import KuraWeb.InventoryComponents, only: [chip_picker: 1]
 
   alias Kura.Inventory
   alias Kura.Inventory.Item
+
+  @kinds ~w(tag location)
 
   @doc """
   Turns what was typed in a search box into a name and tags: words that are the name of a tag
@@ -43,7 +45,7 @@ defmodule KuraWeb.ItemFormComponent do
   def update(assigns, socket) do
     socket = assign(socket, assigns)
     socket = if Map.has_key?(socket.assigns, :form), do: socket, else: init(socket)
-    {:ok, load_tags(socket)}
+    {:ok, load_options(socket)}
   end
 
   defp init(%{assigns: %{item: nil, prefill: prefill}} = socket) do
@@ -61,12 +63,25 @@ defmodule KuraWeb.ItemFormComponent do
         }
       )
 
-    assign(socket, form: to_form(form), tag_ids: prefill.tag_ids, tag_query: "")
+    assign(socket,
+      form: to_form(form),
+      tag_ids: prefill.tag_ids,
+      location_ids: Map.get(prefill, :location_ids, []),
+      tag_query: "",
+      location_query: ""
+    )
   end
 
   defp init(%{assigns: %{item: item}} = socket) do
     form = AshPhoenix.Form.for_update(item, :update, as: "item", actor: actor(socket))
-    assign(socket, form: to_form(form), tag_ids: Enum.map(item.tags, & &1.id), tag_query: "")
+
+    assign(socket,
+      form: to_form(form),
+      tag_ids: Enum.map(item.tags, & &1.id),
+      location_ids: Enum.map(item.locations, & &1.id),
+      tag_query: "",
+      location_query: ""
+    )
   end
 
   @impl true
@@ -76,7 +91,8 @@ defmodule KuraWeb.ItemFormComponent do
     {:noreply,
      socket
      |> assign(form: to_form(form))
-     |> assign(:tag_query, Map.get(all, "tag_query", socket.assigns.tag_query))}
+     |> assign(:tag_query, Map.get(all, "tag_query", socket.assigns.tag_query))
+     |> assign(:location_query, Map.get(all, "location_query", socket.assigns.location_query))}
   end
 
   def handle_event("save", %{"item" => params}, socket) do
@@ -110,56 +126,89 @@ defmodule KuraWeb.ItemFormComponent do
     {:noreply, socket}
   end
 
-  def handle_event("add_tag", %{"id" => id}, socket) do
-    {:noreply, assign(socket, tag_ids: Enum.uniq(socket.assigns.tag_ids ++ [id]), tag_query: "")}
+  def handle_event("add_chip", %{"kind" => kind, "id" => id}, socket) when kind in @kinds do
+    {ids, query} = {ids_key(kind), query_key(kind)}
+    {:noreply, socket |> assign(ids, Enum.uniq(socket.assigns[ids] ++ [id])) |> assign(query, "")}
   end
 
-  def handle_event("remove_tag", %{"id" => id}, socket) do
-    {:noreply, assign(socket, tag_ids: List.delete(socket.assigns.tag_ids, id))}
+  def handle_event("remove_chip", %{"kind" => kind, "id" => id}, socket) when kind in @kinds do
+    ids = ids_key(kind)
+    {:noreply, assign(socket, ids, List.delete(socket.assigns[ids], id))}
   end
 
-  def handle_event("create_tag", _params, socket) do
-    {:noreply, create_tag(socket, String.trim(socket.assigns.tag_query))}
+  def handle_event("create_chip", %{"kind" => kind}, socket) when kind in @kinds do
+    {:noreply, create_chip(socket, kind, String.trim(socket.assigns[query_key(kind)]))}
   end
 
-  # Enter in the tag box: take the tag that is typed out or the only one left, else make a new one.
-  def handle_event("tag_enter", _params, socket) do
-    query = String.trim(socket.assigns.tag_query)
+  # Enter in a search box: take the one that is typed out or the only one left; make a new one only
+  # when nothing similar exists.
+  def handle_event("chip_enter", %{"kind" => kind}, socket) when kind in @kinds do
+    query = String.trim(socket.assigns[query_key(kind)])
     downcased = String.downcase(query)
-    typed = Enum.find(socket.assigns.tags, &(String.downcase(to_string(&1.name)) == downcased))
+    options = socket.assigns[options_key(kind)]
+    chosen = socket.assigns[ids_key(kind)]
+    typed = Enum.find(options, &(String.downcase(to_string(&1.name)) == downcased))
 
     candidates =
-      Enum.filter(socket.assigns.tags, fn tag ->
-        tag.id not in socket.assigns.tag_ids and
-          String.contains?(String.downcase(to_string(tag.name)), downcased)
+      Enum.filter(options, fn option ->
+        option.id not in chosen and
+          String.contains?(String.downcase(to_string(option.name)), downcased)
       end)
 
     cond do
-      query == "" -> {:noreply, socket}
-      typed -> handle_event("add_tag", %{"id" => typed.id}, socket)
-      match?([_], candidates) -> handle_event("add_tag", %{"id" => hd(candidates).id}, socket)
-      true -> {:noreply, create_tag(socket, query)}
+      query == "" ->
+        {:noreply, socket}
+
+      typed ->
+        handle_event("add_chip", %{"kind" => kind, "id" => typed.id}, socket)
+
+      match?([_], candidates) ->
+        handle_event("add_chip", %{"kind" => kind, "id" => hd(candidates).id}, socket)
+
+      # Several similar ones: the person is choosing, not naming something new.
+      candidates != [] ->
+        {:noreply, socket}
+
+      true ->
+        {:noreply, create_chip(socket, kind, query)}
     end
   end
 
   defp actor(socket), do: socket.assigns.current_user
 
-  defp load_tags(socket),
-    do: assign(socket, :tags, Inventory.list_tags!(actor: actor(socket)))
+  defp load_options(socket) do
+    assign(socket,
+      tags: Inventory.list_tags!(actor: actor(socket)),
+      locations: Inventory.list_locations!(actor: actor(socket))
+    )
+  end
 
-  defp create_tag(socket, ""), do: socket
+  defp ids_key("tag"), do: :tag_ids
+  defp ids_key("location"), do: :location_ids
+  defp query_key("tag"), do: :tag_query
+  defp query_key("location"), do: :location_query
+  defp options_key("tag"), do: :tags
+  defp options_key("location"), do: :locations
 
-  defp create_tag(socket, name) do
-    case Inventory.create_tag(%{name: name}, actor: actor(socket)) do
-      {:ok, tag} ->
+  defp create_chip(socket, _kind, ""), do: socket
+
+  defp create_chip(socket, kind, name) do
+    case create(kind, name, actor(socket)) do
+      {:ok, created} ->
+        {ids, query} = {ids_key(kind), query_key(kind)}
+
         socket
-        |> assign(tag_ids: Enum.uniq(socket.assigns.tag_ids ++ [tag.id]), tag_query: "")
-        |> load_tags()
+        |> assign(ids, Enum.uniq(socket.assigns[ids] ++ [created.id]))
+        |> assign(query, "")
+        |> load_options()
 
       {:error, _} ->
-        load_tags(socket)
+        load_options(socket)
     end
   end
+
+  defp create("tag", name, actor), do: Inventory.create_tag(%{name: name}, actor: actor)
+  defp create("location", name, actor), do: Inventory.create_location(%{name: name}, actor: actor)
 
   # The buttons change the form like a typed value would: all current values plus the new one.
   defp revalidate(socket, changes) do
@@ -310,7 +359,27 @@ defmodule KuraWeb.ItemFormComponent do
       </section>
 
       <section>
-        <.tag_picker tags={@tags} selected={@tag_ids} query={@tag_query} target={@myself} />
+        <.chip_picker
+          kind="tag"
+          label="Tags"
+          placeholder="Search or add a tag"
+          options={@tags}
+          selected={@tag_ids}
+          query={@tag_query}
+          target={@myself}
+        />
+      </section>
+
+      <section>
+        <.chip_picker
+          kind="location"
+          label="Where it lives"
+          placeholder="Search or add a place"
+          options={@locations}
+          selected={@location_ids}
+          query={@location_query}
+          target={@myself}
+        />
       </section>
 
       <section :if={new?(@item)}>

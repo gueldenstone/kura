@@ -580,7 +580,7 @@ defmodule KuraWeb.InventoryLiveTest do
     end
 
     defp start_check(conn) do
-      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/all")
       view
     end
 
@@ -669,7 +669,7 @@ defmodule KuraWeb.InventoryLiveTest do
       assert has_element?(view, "#check-card-#{ctx.mint.id}")
     end
 
-    test "shows an all-checked card after the last item that leads back to the inventory", %{
+    test "shows an all-checked card after the last item that leads back to the places", %{
       conn: conn
     } do
       view = start_check(conn)
@@ -679,7 +679,7 @@ defmodule KuraWeb.InventoryLiveTest do
       assert has_element?(view, "#check-done", "All checked")
       assert has_element?(view, "[data-role=check-progress]", "3 of 3")
 
-      assert {:error, {:live_redirect, %{to: "/inventory"}}} =
+      assert {:error, {:live_redirect, %{to: "/inventory/check"}}} =
                view |> element("#check-done a") |> render_click()
     end
 
@@ -803,11 +803,11 @@ defmodule KuraWeb.InventoryLiveTest do
       view |> element("#item-#{cumin.id} button[phx-click=edit]") |> render_click()
 
       view |> form("#item-form", tag_query: "gro") |> render_change()
-      view |> element("#tag-query") |> render_hook("tag_enter", %{})
+      view |> element("#tag-query") |> render_hook("chip_enter", %{"kind" => "tag"})
       assert has_element?(view, "#tag-picker [data-role=chosen-tag]", "ground")
 
       view |> form("#item-form", tag_query: "whole") |> render_change()
-      view |> element("#tag-query") |> render_hook("tag_enter", %{})
+      view |> element("#tag-query") |> render_hook("chip_enter", %{"kind" => "tag"})
       assert has_element?(view, "#tag-picker [data-role=chosen-tag]", "whole")
       assert length(Inventory.list_tags!(actor: user)) == 2
     end
@@ -829,7 +829,7 @@ defmodule KuraWeb.InventoryLiveTest do
       ground = tag(user, "ground")
       cumin = tagged(user, "Cumin", [ground])
 
-      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/all")
 
       assert has_element?(view, "#check-card-#{cumin.id} [data-role=tags]", "ground")
     end
@@ -838,7 +838,7 @@ defmodule KuraWeb.InventoryLiveTest do
   describe "the item form while checking the stock" do
     test "opens as a sheet from the card, saves and closes", %{conn: conn, user: user} do
       mint = item(user, %{name: "Mint", stock_count: 2})
-      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/all")
 
       view |> element("#edit-checked") |> render_click()
       assert has_element?(view, "#item-form")
@@ -854,7 +854,7 @@ defmodule KuraWeb.InventoryLiveTest do
 
     test "can delete the item from the sheet", %{conn: conn, user: user} do
       mint = item(user, %{name: "Mint"})
-      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/all")
 
       view |> element("#edit-checked") |> render_click()
       view |> element("button[phx-click=delete]") |> render_click()
@@ -867,7 +867,7 @@ defmodule KuraWeb.InventoryLiveTest do
 
     test "Cancel closes the sheet and keeps the item as it was", %{conn: conn, user: user} do
       mint = item(user, %{name: "Mint"})
-      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/all")
 
       view |> element("#edit-checked") |> render_click()
       view |> form("#item-form", item: %{name: "Peppermint"}) |> render_change()
@@ -875,6 +875,322 @@ defmodule KuraWeb.InventoryLiveTest do
 
       refute has_element?(view, "#item-form")
       assert to_string(stored(user, mint).name) == "Mint"
+    end
+  end
+
+  describe "locations" do
+    defp place(user, name), do: Inventory.create_location!(%{name: name}, actor: user)
+
+    defp stocked(user, name, places) do
+      Inventory.create_item!(
+        %{name: name, tracking: :level, location_ids: Enum.map(places, & &1.id)},
+        actor: user
+      )
+    end
+
+    defp place_names(user, item) do
+      item.id
+      |> Inventory.get_item!(actor: user, load: [:locations])
+      |> Map.fetch!(:locations)
+      |> Enum.map(&to_string(&1.name))
+      |> Enum.sort()
+    end
+
+    test "places are picked and created in the item form", %{conn: conn, user: user} do
+      place(user, "Fridge")
+      tahini = stocked(user, "Tahini", [])
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{tahini.id} button[phx-click=edit]") |> render_click()
+
+      view
+      |> element("#location-picker [data-role=available-location]", "Fridge")
+      |> render_click()
+
+      assert has_element?(view, "#location-picker [data-role=chosen-location]", "Fridge")
+
+      view |> form("#item-form", location_query: "Cupboard") |> render_change()
+      view |> element("#location-picker [data-role=create-location]") |> render_click()
+      assert has_element?(view, "#location-picker [data-role=chosen-location]", "Cupboard")
+
+      submit_item_form(view)
+      assert place_names(user, tahini) == ["Cupboard", "Fridge"]
+
+      view |> element("#item-#{tahini.id} button[phx-click=edit]") |> render_click()
+      view |> element("#location-picker [data-role=chosen-location]", "Fridge") |> render_click()
+      submit_item_form(view)
+      assert place_names(user, tahini) == ["Cupboard"]
+    end
+
+    test "Enter in the place box takes the only match", %{conn: conn, user: user} do
+      place(user, "Freezer")
+      tahini = stocked(user, "Tahini", [])
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+      view |> element("#item-#{tahini.id} button[phx-click=edit]") |> render_click()
+
+      view |> form("#item-form", location_query: "free") |> render_change()
+      view |> element("#location-query") |> render_hook("chip_enter", %{"kind" => "location"})
+
+      assert has_element?(view, "#location-picker [data-role=chosen-location]", "Freezer")
+    end
+
+    test "rows show the places only while searching", %{conn: conn, user: user} do
+      fridge = place(user, "Fridge")
+      tahini = stocked(user, "Tahini", [fridge])
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      refute has_element?(view, "#item-#{tahini.id} [data-role=locations]")
+
+      view |> form("#search-form", search: %{query: "fridge"}) |> render_change()
+      assert has_element?(view, "#item-#{tahini.id} [data-role=locations]", "Fridge")
+
+      view |> form("#search-form", search: %{query: "tahini"}) |> render_change()
+      assert has_element?(view, "#item-#{tahini.id} [data-role=locations]", "Fridge")
+    end
+
+    test "Enter with several similar places creates nothing", %{conn: conn, user: user} do
+      place(user, "Fridge door")
+      place(user, "Fridge shelf")
+      tahini = stocked(user, "Tahini", [])
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+      view |> element("#item-#{tahini.id} button[phx-click=edit]") |> render_click()
+
+      view |> form("#item-form", location_query: "fridge") |> render_change()
+      view |> element("#location-query") |> render_hook("chip_enter", %{"kind" => "location"})
+
+      refute has_element?(view, "#location-picker [data-role=chosen-location]")
+      assert length(Inventory.list_locations!(actor: user)) == 2
+    end
+
+    test "the More menu has a Locations entry on the inventory too", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      assert has_element?(view, "nav #more-menu a[href='/locations']", "Locations")
+    end
+  end
+
+  describe "checking one place" do
+    setup %{user: user} do
+      fridge = place(user, "Fridge")
+      cupboard = place(user, "Cupboard")
+      tahini = stocked(user, "Tahini", [fridge, cupboard])
+      butter = stocked(user, "Butter", [fridge])
+      rice = stocked(user, "Rice", [cupboard])
+      loose = stocked(user, "Loose", [])
+
+      %{
+        fridge: fridge,
+        cupboard: cupboard,
+        tahini: tahini,
+        butter: butter,
+        rice: rice,
+        loose: loose
+      }
+    end
+
+    test "the Check tab starts with a picker of places, unplaced items and everything", %{
+      conn: conn,
+      fridge: fridge,
+      cupboard: cupboard
+    } do
+      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+
+      assert has_element?(view, "nav a[aria-current=page]", "Check")
+      assert has_element?(view, "#pick-#{fridge.id} [data-role=item-count]", "2 items")
+      assert has_element?(view, "#pick-#{cupboard.id} [data-role=item-count]", "2 items")
+      assert has_element?(view, "#pick-unplaced [data-role=item-count]", "1 item")
+      assert has_element?(view, "#pick-all [data-role=item-count]", "4 items")
+      refute has_element?(view, "#check-overlay")
+      refute has_element?(view, "#items")
+    end
+
+    test "choosing a place walks only the items that live there, stalest first", %{
+      conn: conn,
+      user: user,
+      fridge: fridge,
+      tahini: tahini,
+      butter: butter,
+      rice: rice
+    } do
+      backdate(user, tahini, 60)
+      backdate(user, butter, 30)
+
+      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+
+      {:ok, view, _html} =
+        view |> element("#pick-#{fridge.id}") |> render_click() |> follow_redirect(conn)
+
+      assert has_element?(view, "[data-role=check-scope]", "Fridge")
+      assert has_element?(view, "[data-role=check-progress]", "1 of 2")
+      assert has_element?(view, "#check-card-#{tahini.id}")
+
+      view |> element("#check-next") |> render_click()
+      assert has_element?(view, "#check-card-#{butter.id}")
+
+      view |> element("#check-next") |> render_click()
+      assert has_element?(view, "#check-done")
+      refute has_element?(view, "#check-card-#{rice.id}")
+    end
+
+    test "an item in another place too says so, an item only here does not", %{
+      conn: conn,
+      user: user,
+      fridge: fridge,
+      tahini: tahini,
+      butter: butter
+    } do
+      backdate(user, tahini, 60)
+      backdate(user, butter, 30)
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/#{fridge.id}")
+
+      assert has_element?(
+               view,
+               "#check-card-#{tahini.id} [data-role=also-in]",
+               "Also in Cupboard"
+             )
+
+      view |> element("#check-next") |> render_click()
+      assert has_element?(view, "#check-card-#{butter.id}")
+      refute has_element?(view, "[data-role=also-in]")
+    end
+
+    test "Not here anymore takes the place off the item and moves on", %{
+      conn: conn,
+      user: user,
+      fridge: fridge,
+      butter: butter,
+      tahini: tahini
+    } do
+      backdate(user, butter, 60)
+      backdate(user, tahini, 30)
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/#{fridge.id}")
+
+      assert has_element?(view, "#check-card-#{butter.id}")
+      view |> element("#not-here") |> render_click()
+
+      refute has_element?(view, "#check-card-#{butter.id}")
+      assert has_element?(view, "#check-card-#{tahini.id}")
+      assert has_element?(view, "[data-role=check-progress]", "1 of 1")
+      assert place_names(user, butter) == []
+      assert {:ok, _} = Inventory.get_item(butter.id, actor: user)
+    end
+
+    test "Not here anymore keeps the other places of the item", %{
+      conn: conn,
+      user: user,
+      fridge: fridge,
+      butter: butter,
+      tahini: tahini
+    } do
+      backdate(user, tahini, 60)
+      backdate(user, butter, 30)
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/#{fridge.id}")
+
+      assert has_element?(view, "#check-card-#{tahini.id}")
+      view |> element("#not-here") |> render_click()
+
+      assert place_names(user, tahini) == ["Cupboard"]
+    end
+
+    test "confirming in one place makes the item recent in the other", %{
+      conn: conn,
+      user: user,
+      fridge: fridge,
+      cupboard: cupboard,
+      tahini: tahini,
+      rice: rice
+    } do
+      backdate(user, tahini, 60)
+      backdate(user, rice, 30)
+
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/#{fridge.id}")
+      assert has_element?(view, "#check-card-#{tahini.id}")
+      view |> element("#confirm-stock") |> render_click()
+
+      # Stalest first: rice is now the first card in the cupboard and the confirmed item the last.
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/#{cupboard.id}")
+      assert has_element?(view, "#check-card-#{rice.id}")
+      view |> element("#check-next") |> render_click()
+      assert has_element?(view, "#check-card-#{tahini.id} [data-role=checked-ago]", "today")
+    end
+
+    test "an item the other phone took out of the place drops out of the walk", %{
+      conn: conn,
+      user: user,
+      fridge: fridge,
+      butter: butter,
+      tahini: tahini
+    } do
+      backdate(user, tahini, 60)
+      backdate(user, butter, 30)
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/#{fridge.id}")
+      assert has_element?(view, "#check-card-#{tahini.id}")
+
+      link = Inventory.get_item_location!(tahini.id, fridge.id, actor: user)
+      :ok = Inventory.remove_item_location(link, actor: user)
+      render(view)
+
+      refute has_element?(view, "#check-card-#{tahini.id}")
+      assert has_element?(view, "#check-card-#{butter.id}")
+      assert has_element?(view, "[data-role=check-progress]", "1 of 1")
+    end
+
+    test "Not here anymore does not crash when the place is already gone from the item", %{
+      conn: conn,
+      user: user,
+      fridge: fridge,
+      butter: butter
+    } do
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/#{fridge.id}")
+      assert has_element?(view, "#not-here")
+
+      # The page has not heard yet: the notification is returned instead of broadcast.
+      link = Inventory.get_item_location!(butter.id, fridge.id, actor: user)
+      Ash.destroy!(link, actor: user, return_notifications?: true)
+
+      view |> element("#not-here") |> render_click()
+      assert render(view) =~ "Check stock"
+    end
+
+    test "unplaced items have their own stop", %{conn: conn, loose: loose} do
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/unplaced")
+
+      assert has_element?(view, "[data-role=check-scope]", "Not placed yet")
+      assert has_element?(view, "#check-card-#{loose.id}")
+      assert has_element?(view, "[data-role=check-progress]", "1 of 1")
+      refute has_element?(view, "#not-here")
+    end
+
+    test "Everything walks all items without the place buttons", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/all")
+
+      assert has_element?(view, "[data-role=check-progress]", "1 of 4")
+      refute has_element?(view, "#not-here")
+      refute has_element?(view, "[data-role=also-in]")
+    end
+
+    test "a place without items says so instead of celebrating", %{conn: conn, user: user} do
+      empty = place(user, "Empty drawer")
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/#{empty.id}")
+
+      assert has_element?(view, "#check-done", "Nothing here")
+      refute has_element?(view, "#check-done", "All checked")
+    end
+
+    test "an unknown place goes back to the picker", %{conn: conn} do
+      assert {:error, {:live_redirect, %{to: "/inventory/check", flash: flash}}} =
+               live(conn, ~p"/inventory/check/#{Ecto.UUID.generate()}")
+
+      assert flash["error"] =~ "no longer exists"
+
+      assert {:error, {:live_redirect, %{to: "/inventory/check"}}} =
+               live(conn, ~p"/inventory/check/nonsense")
+    end
+
+    test "Change place leads back to the picker", %{conn: conn, fridge: fridge} do
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/#{fridge.id}")
+
+      assert has_element?(view, "#change-place[href='/inventory/check']")
     end
   end
 end

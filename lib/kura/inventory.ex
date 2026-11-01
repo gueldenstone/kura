@@ -14,6 +14,8 @@ defmodule Kura.Inventory do
       define :search_items, action: :search, args: [:query]
       define :list_items_by_ids, action: :by_ids, args: [:ids]
       define :list_items_to_check, action: :to_check
+      define :list_items_to_check_at, action: :to_check_at, args: [:location_id]
+      define :list_items_to_check_unplaced, action: :to_check_unplaced
       define :confirm_item_stock, action: :confirm_stock
       define :change_item_count, action: :change_count, args: [:delta]
       define :set_item_count, action: :set_count, args: [:count]
@@ -30,6 +32,19 @@ defmodule Kura.Inventory do
     end
 
     resource Kura.Inventory.ItemTag
+
+    resource Kura.Inventory.Location do
+      define :create_location, action: :create
+      define :update_location, action: :update
+      define :delete_location, action: :destroy
+      define :get_location, action: :read, get_by: :id
+      define :list_locations, action: :list
+    end
+
+    resource Kura.Inventory.ItemLocation do
+      define :get_item_location, action: :read, get_by: [:item_id, :location_id]
+      define :remove_item_location, action: :destroy
+    end
 
     resource Kura.Inventory.ShoppingEntry do
       define :add_entry, action: :add

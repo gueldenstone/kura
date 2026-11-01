@@ -33,3 +33,4 @@ Template:
 | [0008](0008-offline-implementation.md) | How offline works | Accepted |
 | [0009](0009-deployment.md) | Deployment: one Docker image, SQLite on a volume | Accepted |
 | [0010](0010-item-tags.md) | Items are told apart by name and tags | Accepted |
+| [0011](0011-item-locations.md) | Items live in locations, stock stays per item | Accepted |

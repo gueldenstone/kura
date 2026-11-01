@@ -23,9 +23,11 @@ defmodule Kura.Inventory.Item do
       accept [:name, :tracking, :usual_amount, :auto_replenish, :stock_count, :stock_level]
 
       argument :tag_ids, {:array, :uuid}, constraints: [remove_nil_items?: true]
+      argument :location_ids, {:array, :uuid}, constraints: [remove_nil_items?: true]
 
       change Kura.Inventory.Item.Changes.NormalizeStock
       change Kura.Inventory.Item.Changes.SetTags
+      change manage_relationship(:location_ids, :locations, type: :append_and_remove)
     end
 
     update :update do
@@ -34,8 +36,10 @@ defmodule Kura.Inventory.Item do
       require_atomic? false
 
       argument :tag_ids, {:array, :uuid}, constraints: [remove_nil_items?: true]
+      argument :location_ids, {:array, :uuid}, constraints: [remove_nil_items?: true]
 
       change Kura.Inventory.Item.Changes.SetTags
+      change manage_relationship(:location_ids, :locations, type: :append_and_remove)
     end
 
     update :change_count do
@@ -108,21 +112,38 @@ defmodule Kura.Inventory.Item do
     end
 
     read :search do
-      description "All items by name, optionally only those where every word of the query is part of the name or a tag."
+      description "All items by name, optionally only those where every word of the query is part of the name, a tag or a location."
 
       argument :query, :string,
         allow_nil?: false,
         default: "",
         constraints: [allow_empty?: true, trim?: false]
 
-      prepare build(sort: [name: :asc], load: [:tags])
+      prepare build(sort: [name: :asc], load: [:tags, :locations])
       prepare Kura.Inventory.Item.Preparations.MatchWords
     end
 
     read :to_check do
       description "All items, the ones whose stock was checked or changed longest ago first."
 
-      prepare build(sort: [stock_checked_at: :asc, name: :asc], load: [:tags])
+      prepare build(sort: [stock_checked_at: :asc, name: :asc], load: [:tags, :locations])
+    end
+
+    read :to_check_at do
+      description "The items that live in a location, the ones whose stock was checked or changed longest ago first."
+      argument :location_id, :uuid, allow_nil?: false
+
+      filter expr(exists(locations, id == ^arg(:location_id)))
+
+      prepare build(sort: [stock_checked_at: :asc, name: :asc], load: [:tags, :locations])
+    end
+
+    read :to_check_unplaced do
+      description "The items without any location, the ones whose stock was checked or changed longest ago first."
+
+      filter expr(not exists(locations, true))
+
+      prepare build(sort: [stock_checked_at: :asc, name: :asc], load: [:tags, :locations])
     end
 
     read :by_ids do
@@ -131,7 +152,7 @@ defmodule Kura.Inventory.Item do
 
       filter expr(id in ^arg(:ids))
 
-      prepare build(sort: [name: :asc], load: [:tags])
+      prepare build(sort: [name: :asc], load: [:tags, :locations])
     end
   end
 
@@ -215,6 +236,12 @@ defmodule Kura.Inventory.Item do
       through Kura.Inventory.ItemTag
       source_attribute_on_join_resource :item_id
       destination_attribute_on_join_resource :tag_id
+    end
+
+    many_to_many :locations, Kura.Inventory.Location do
+      through Kura.Inventory.ItemLocation
+      source_attribute_on_join_resource :item_id
+      destination_attribute_on_join_resource :location_id
     end
   end
 

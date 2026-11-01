@@ -10,15 +10,15 @@ defmodule KuraWeb.InventoryLive do
   @undo_timeout 10_000
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     socket =
       socket
       |> assign(:page_title, "Inventory")
       |> assign(query: "", adding: nil, editing: nil, edit_item: nil, undo: nil)
       |> assign(selecting?: false, selected: MapSet.new())
-      |> assign(checking: nil, check_item: nil)
+      |> assign(checking: nil, check_item: nil, check_choices: nil)
       |> assign(tags: [])
-      |> start_check_on_check_route()
+      |> start_check_on_check_route(params)
       |> assign_search_form()
       |> load_items()
 
@@ -45,6 +45,29 @@ defmodule KuraWeb.InventoryLive do
     {socket, _moved?} = move_check(socket, 1)
     {:noreply, socket}
   end
+
+  def handle_event(
+        "not_here",
+        _params,
+        %{
+          assigns: %{
+            check_item: %Item{} = item,
+            checking: %{scope: {:location, location}} = checking
+          }
+        } = socket
+      ) do
+    # The other phone may have taken the item out of this place already.
+    with {:ok, link} <- Inventory.get_item_location(item.id, location.id, actor: actor(socket)) do
+      :ok = Inventory.remove_item_location(link, actor: actor(socket))
+    end
+
+    {:noreply,
+     socket
+     |> assign(checking: %{checking | ids: List.delete(checking.ids, item.id)})
+     |> refresh_check()}
+  end
+
+  def handle_event("not_here", _params, socket), do: {:noreply, socket}
 
   def handle_event("check_prev", _params, socket) do
     {socket, _moved?} = move_check(socket, -1)
@@ -242,16 +265,80 @@ defmodule KuraWeb.InventoryLive do
         load: [:empty?, :on_list?]
       )
 
-    socket |> assign(:items, items) |> load_tags() |> refresh_check()
+    socket |> assign(:items, items) |> load_tags() |> refresh_check() |> refresh_check_choices()
   end
 
-  # The check lives on its own route, `/inventory/check`, which is the middle tab.
-  defp start_check_on_check_route(%{assigns: %{live_action: :check}} = socket) do
-    ids = Enum.map(Inventory.list_items_to_check!(actor: actor(socket)), & &1.id)
-    socket |> assign(checking: %{ids: ids, index: 0}) |> refresh_check()
+  # The check lives on its own routes, behind the middle tab: `/inventory/check` picks a place
+  # and `/inventory/check/:scope` walks it, where the scope is a location id, "unplaced" or "all".
+  defp start_check_on_check_route(%{assigns: %{live_action: :check}} = socket, %{"scope" => scope}) do
+    case check_scope(socket, scope) do
+      {:ok, scope, items} ->
+        socket
+        |> assign(checking: %{ids: Enum.map(items, & &1.id), index: 0, scope: scope})
+        |> refresh_check()
+
+      :error ->
+        socket
+        |> put_flash(:error, "That place no longer exists")
+        |> push_navigate(to: ~p"/inventory/check")
+    end
   end
 
-  defp start_check_on_check_route(socket), do: socket
+  defp start_check_on_check_route(%{assigns: %{live_action: :check_pick}} = socket, _params),
+    do: assign_check_choices(socket)
+
+  defp start_check_on_check_route(socket, _params), do: socket
+
+  defp check_scope(socket, "all"),
+    do: {:ok, :all, Inventory.list_items_to_check!(actor: actor(socket))}
+
+  defp check_scope(socket, "unplaced"),
+    do: {:ok, :unplaced, Inventory.list_items_to_check_unplaced!(actor: actor(socket))}
+
+  defp check_scope(socket, id) do
+    case Inventory.get_location(id, actor: actor(socket)) do
+      {:ok, location} ->
+        {:ok, {:location, location},
+         Inventory.list_items_to_check_at!(location.id, actor: actor(socket))}
+
+      {:error, _} ->
+        :error
+    end
+  end
+
+  defp assign_check_choices(socket) do
+    actor = actor(socket)
+
+    assign(socket,
+      check_choices: %{
+        locations: Inventory.list_locations!(actor: actor),
+        unplaced: length(Inventory.list_items_to_check_unplaced!(actor: actor)),
+        all: length(Inventory.list_items_to_check!(actor: actor))
+      }
+    )
+  end
+
+  defp scope_title(:all), do: "Everything"
+  defp scope_title(:unplaced), do: "Not placed yet"
+  defp scope_title({:location, location}), do: to_string(location.name)
+
+  # An item that left the place being walked (the other phone took it out) is not checked here.
+  defp in_scope?(item, {:location, location}),
+    do: Enum.any?(item.locations, &(&1.id == location.id))
+
+  defp in_scope?(_item, _scope), do: true
+
+  # The other places of an item that is checked in one place: its stock counts them all.
+  defp other_places(item, %{scope: {:location, location}}) do
+    item.locations |> Enum.reject(&(&1.id == location.id)) |> Enum.map(&to_string(&1.name))
+  end
+
+  defp other_places(_item, _checking), do: []
+
+  defp refresh_check_choices(%{assigns: %{live_action: :check_pick}} = socket),
+    do: assign_check_choices(socket)
+
+  defp refresh_check_choices(socket), do: socket
 
   # Loads the item the check is on. Items that were deleted meanwhile drop out of the check.
   defp refresh_check(%{assigns: %{checking: nil}} = socket), do: socket
@@ -259,9 +346,18 @@ defmodule KuraWeb.InventoryLive do
   defp refresh_check(%{assigns: %{checking: %{ids: ids, index: index} = checking}} = socket) do
     with id when is_binary(id) <- Enum.at(ids, index),
          {:ok, item} <-
-           Inventory.get_item(id, actor: actor(socket), load: [:empty?, :on_list?, :tags]) do
+           Inventory.get_item(id,
+             actor: actor(socket),
+             load: [:empty?, :on_list?, :tags, :locations]
+           ),
+         true <- in_scope?(item, checking.scope) do
       assign(socket, check_item: item)
     else
+      false ->
+        socket
+        |> assign(checking: %{checking | ids: List.delete_at(ids, index)})
+        |> refresh_check()
+
       nil ->
         assign(socket, check_item: nil)
 
@@ -285,6 +381,31 @@ defmodule KuraWeb.InventoryLive do
 
   defp move_check(socket, _step), do: {socket, false}
 
+  attr :id, :string, required: true
+  attr :href, :string, required: true
+  attr :title, :string, required: true
+  attr :subtitle, :string, default: nil
+  attr :count, :integer, required: true
+
+  defp pick_card(assigns) do
+    ~H"""
+    <.link
+      navigate={@href}
+      id={@id}
+      class="flex items-center gap-3 rounded-box bg-base-100 py-3.5 pr-3 pl-4 shadow-card transition active:scale-[0.99]"
+    >
+      <span class="min-w-0 flex-1">
+        <span class="block truncate text-[17px] font-bold">{@title}</span>
+        <span :if={@subtitle} class="block truncate text-[13px] text-base-content/55">{@subtitle}</span>
+      </span>
+      <span data-role="item-count" class="shrink-0 text-sm text-base-content/55">
+        {if @count == 1, do: "1 item", else: "#{@count} items"}
+      </span>
+      <.icon name="hero-chevron-right" class="size-5 shrink-0 text-base-content/40" />
+    </.link>
+    """
+  end
+
   defp check_percent(%{ids: [], index: _}), do: 100
 
   defp check_percent(%{ids: ids, index: index}),
@@ -301,7 +422,7 @@ defmodule KuraWeb.InventoryLive do
 
   # An item can vanish while this page is open, for example when the other person deletes it.
   defp with_item(socket, id, fun) do
-    case Inventory.get_item(id, actor: actor(socket), load: [:tags]) do
+    case Inventory.get_item(id, actor: actor(socket), load: [:tags, :locations]) do
       {:ok, item} ->
         fun.(item)
 
@@ -381,7 +502,7 @@ defmodule KuraWeb.InventoryLive do
     <Layouts.app
       flash={@flash}
       current_user={@current_user}
-      active={if @checking, do: :check, else: :inventory}
+      active={if @checking || @live_action == :check_pick, do: :check, else: :inventory}
       open_count={@open_count}
     >
       <div
@@ -395,6 +516,21 @@ defmodule KuraWeb.InventoryLive do
           <span data-role="check-progress" class="text-sm font-bold text-base-content/60 tabular-nums">
             {min(@checking.index + 1, length(@checking.ids))} of {length(@checking.ids)}
           </span>
+        </div>
+        <div class="mt-1 flex items-center justify-between gap-3">
+          <p
+            data-role="check-scope"
+            class="min-w-0 truncate text-sm font-semibold text-base-content/60"
+          >
+            {scope_title(@checking.scope)}
+          </p>
+          <.link
+            navigate={~p"/inventory/check"}
+            id="change-place"
+            class="shrink-0 text-[13px] font-bold text-primary"
+          >
+            Change place
+          </.link>
         </div>
         <div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-base-300">
           <div
@@ -428,6 +564,14 @@ defmodule KuraWeb.InventoryLive do
             <p data-role="checked-ago" class="mt-1 text-sm text-base-content/55">
               Stock last changed {checked_ago(@check_item.stock_checked_at)}
             </p>
+            <p
+              :if={other_places(@check_item, @checking) != []}
+              data-role="also-in"
+              class="mt-3 rounded-2xl bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary"
+            >
+              Also in {Enum.join(other_places(@check_item, @checking), ", ")}. Count what is there too,
+              the stock is for the whole item.
+            </p>
             <div class="mt-6 flex justify-center">
               <.stock_control item={@check_item} />
             </div>
@@ -439,7 +583,16 @@ defmodule KuraWeb.InventoryLive do
             >
               Still right
             </button>
-            <div class="mt-3 flex items-center justify-between gap-2">
+            <button
+              :if={match?({:location, _}, @checking.scope)}
+              type="button"
+              id="not-here"
+              phx-click="not_here"
+              class="mt-3 h-10 w-full rounded-full text-[13px] font-bold text-base-content/60 transition hover:bg-base-300/60 active:scale-95"
+            >
+              Not here anymore
+            </button>
+            <div class="mt-1 flex items-center justify-between gap-2">
               <button
                 type="button"
                 id="check-prev"
@@ -485,11 +638,17 @@ defmodule KuraWeb.InventoryLive do
             data-swipe-card
             class="w-full max-w-md rounded-box bg-base-100 p-8 text-center shadow-card"
           >
-            <span class="block text-5xl">🎉</span>
-            <h2 class="mt-3 font-display text-2xl font-bold">All checked</h2>
-            <p class="mt-1 text-base-content/60">Nothing left to look at.</p>
+            <span class="block text-5xl">{if @checking.ids == [], do: "🫙", else: "🎉"}</span>
+            <h2 class="mt-3 font-display text-2xl font-bold">
+              {if @checking.ids == [], do: "Nothing here", else: "All checked"}
+            </h2>
+            <p class="mt-1 text-base-content/60">
+              {if @checking.ids == [],
+                do: "No items to check in this place.",
+                else: "Nothing left to look at."}
+            </p>
             <.link
-              navigate={~p"/inventory"}
+              navigate={~p"/inventory/check"}
               class="mt-6 grid h-12 w-full place-items-center rounded-full bg-primary font-extrabold text-primary-content transition hover:brightness-110 active:scale-[0.98]"
             >
               Done
@@ -498,7 +657,49 @@ defmodule KuraWeb.InventoryLive do
         </div>
       </div>
 
-      <div :if={is_nil(@checking)} id="inventory-page">
+      <div :if={@live_action == :check_pick && @check_choices} id="check-picker">
+        <h1 class="font-display text-4xl leading-none font-bold tracking-tight">Check stock</h1>
+        <p class="mt-1 text-sm text-base-content/60">
+          Pick a place and go through what lives there.
+        </p>
+
+        <ul class="mt-5 grid grid-cols-1 gap-2.5">
+          <li :for={location <- @check_choices.locations}>
+            <.pick_card
+              id={"pick-#{location.id}"}
+              href={~p"/inventory/check/#{location.id}"}
+              title={to_string(location.name)}
+              count={location.item_count}
+            />
+          </li>
+          <li>
+            <.pick_card
+              id="pick-unplaced"
+              href={~p"/inventory/check/unplaced"}
+              title="Not placed yet"
+              subtitle="Items without a place"
+              count={@check_choices.unplaced}
+            />
+          </li>
+          <li>
+            <.pick_card
+              id="pick-all"
+              href={~p"/inventory/check/all"}
+              title="Everything"
+              subtitle="All items, the stalest first"
+              count={@check_choices.all}
+            />
+          </li>
+        </ul>
+
+        <p :if={@check_choices.locations == []} class="mt-6 text-center text-sm text-base-content/55">
+          No places yet. Add them under
+          <.link navigate={~p"/locations"} class="font-bold text-primary">More, Locations</.link>
+          or while editing an item.
+        </p>
+      </div>
+
+      <div :if={is_nil(@checking) and @live_action != :check_pick} id="inventory-page">
         <div class="flex items-center justify-between gap-3">
           <h1 class="font-display text-4xl leading-none font-bold tracking-tight">Inventory</h1>
           <button
@@ -630,7 +831,11 @@ defmodule KuraWeb.InventoryLive do
                 aria-label={"Edit #{item.name}"}
                 class="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1.5 text-left transition active:opacity-70"
               >
-                <.item_title item={item} class={item.empty? && "text-base-content/60"} />
+                <.item_title
+                  item={item}
+                  class={item.empty? && "text-base-content/60"}
+                  locations={@query != ""}
+                />
                 <span
                   :if={item.on_list?}
                   data-role="on-list"

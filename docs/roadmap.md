@@ -27,10 +27,10 @@ Planned features after the MVP, in order.
 | 8 | Optional replenishment | Per item: auto-replenish or not. Auto-replenish items go on the shopping list when marked empty; other items only get an Add to list offer in the Undo bar, since they are not regular stock | Done |
 | 9 | Inventory check mode | Each item tracks when its stock last changed. A guided mode walks through the stalest items, asks to confirm the current stock and offers a quick way to update it | Done |
 | 10 | Tags | Shared, user-extendable tags tell items apart (ADR 0010): searchable picker in the item forms, a Tags page behind a three-dots More entry in the bottom bar, tags shown under item names, in search, check cards, the shopping list and on labels | Done |
+| 11 | Locations | Shared, user-extendable locations (cupboards, drawers, fridge), several per item; the Check tab picks one location and walks its items, with a hint when an item is also somewhere else (specification in `docs/locations.md`) | Done |
 
 ## After the MVP (unordered ideas)
 
-- Locations or cupboards, so the inventory check can go through one cupboard at a time (design notes and an open question about items in several places: `docs/locations.md`)
 - Low-stock thresholds for count items that auto-add to the list
 - Categories or store-aisle ordering of the shopping list
 - Broader history beyond check-off undo

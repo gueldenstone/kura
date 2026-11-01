@@ -26,7 +26,7 @@ defmodule KuraWeb.Layouts do
   attr :open_count, :integer, default: 0, doc: "open shopping list entries, shown on its tab"
 
   attr :active, :atom,
-    values: [:shopping_list, :inventory, :check, :tags],
+    values: [:shopping_list, :inventory, :check, :tags, :locations],
     required: true,
     doc: "the current tab"
 
@@ -78,7 +78,7 @@ defmodule KuraWeb.Layouts do
           >
             Check
           </.tab>
-          <.more_menu active={@active == :tags} />
+          <.more_menu active={@active in [:tags, :locations]} />
         </div>
       </nav>
     </div>
@@ -120,6 +120,13 @@ defmodule KuraWeb.Layouts do
           class="flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-bold transition hover:bg-base-200 active:scale-[0.98]"
         >
           <.icon name="hero-tag" class="size-5 text-base-content/60" /> Tags
+        </.link>
+        <.link
+          navigate={~p"/locations"}
+          role="menuitem"
+          class="flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-bold transition hover:bg-base-200 active:scale-[0.98]"
+        >
+          <.icon name="hero-map-pin" class="size-5 text-base-content/60" /> Locations
         </.link>
       </div>
     </div>

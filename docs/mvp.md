@@ -29,10 +29,19 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 - Each inventory row is one line: the name (tap to edit) and one stock control. Level items use a Plenty / Low / Empty selector, count items a minus / number / plus stepper next to a separate Empty button; stepping a count down to 0 also marks it empty.
 - Items that are on the list carry a small cart marker in the inventory.
 
+### Locations
+- Locations are a shared list (a drawer, a cupboard shelf, the fridge) that both users extend. An item can live in several places, or in none yet; the stock stays per item. Names are unique, ignoring case.
+- The **Locations** page (`/locations`, behind the three-dots **More** entry, next to Tags) lists them with their number of items and lets you add, rename and delete them. Deleting takes the place off its items and nothing else.
+- In the item form, **Where it lives** picks places with the same searchable chips as tags, and creates a new place on the spot.
+- Search matches words in the name, the tags and the places. While a search is active, rows show the places of an item as a line with a pin under its name.
+
 ### Inventory check
-- The **Check** tab (`/inventory/check`, the third tab of the bar) is a walk through all items, one card at a time, the ones whose stock was changed or confirmed longest ago first. Each card shows the item, how long ago its stock last changed, the normal stock control, and a progress count ("4 of 23").
-- **Still right** confirms the stock and moves on. **Next** (or a swipe left) moves on without confirming; a swipe right or the back button goes to the previous card. **Delete** removes the item after a confirmation. Emptying an item behaves as in the list, including the Add to list offer.
-- The end of the walk shows "All checked" with a Done button back to the inventory. Leaving through another tab ends it early; nothing done so far is lost.
+- The **Check** tab (`/inventory/check`) starts with a picker: every place with its number of items, **Not placed yet** (items without a place) and **Everything** (all items). Choosing one walks it at `/inventory/check/:scope`.
+- The walk is one card at a time, the items whose stock was changed or confirmed longest ago first. Each card shows the item, how long ago its stock last changed, the normal stock control, and a progress count ("4 of 23"). The place being checked is named under the title with a **Change place** link.
+- When an item also lives somewhere else, its card says so: "Also in Cupboard 2. Count what is there too, the stock is for the whole item." Confirming or changing the stock makes the item fresh, so in its other place it moves to the back of the list and says its stock was changed today.
+- **Not here anymore** (in a place's walk) removes just that place from the item and moves on; an item without any place becomes unplaced.
+- **Still right** confirms the stock and moves on. **Next** (or a swipe left) moves on without confirming; a swipe right or the back button goes to the previous card. **Edit** opens the item form as a sheet. **Delete** removes the item after a confirmation. Emptying an item behaves as in the list, including the Add to list offer.
+- The end of the walk shows "All checked" with a Done button back to the places. Leaving through another tab ends it early; nothing done so far is lost.
 - Online only. Every stock change and every confirmation updates the item's last-checked date.
 
 ### Label export
