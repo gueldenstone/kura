@@ -58,6 +58,20 @@ defmodule KuraWeb.InventoryComponents do
         label="Track stock as"
         options={[{"A count (e.g. apples)", :count}, {"A level: plenty, low, empty", :level}]}
       />
+      <.input
+        :if={to_string(@form[:tracking].value) == "count"}
+        field={@form[:stock_count]}
+        type="number"
+        label="In stock now"
+        min="0"
+      />
+      <.input
+        :if={to_string(@form[:tracking].value) == "level"}
+        field={@form[:stock_level]}
+        type="select"
+        label="In stock now"
+        options={[{"Plenty", :plenty}, {"Running low", :low}, {"Empty", :empty}]}
+      />
       <.input field={@form[:usual_amount]} type="number" label="Usual amount to buy" min="1" />
       <div class="flex gap-2 pt-2">
         <button type="submit" class="btn btn-primary rounded-full">Add item</button>

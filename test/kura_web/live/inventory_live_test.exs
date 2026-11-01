@@ -209,6 +209,53 @@ defmodule KuraWeb.InventoryLiveTest do
       refute has_element?(view, "#new-item-form")
     end
 
+    test "defaults to level tracking and sets the stock right away", %{conn: conn, user: user} do
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+      view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()
+      view |> element("#add-item button") |> render_click()
+
+      view |> form("#new-item-form", item: %{stock_level: "low"}) |> render_submit()
+
+      [walnuts] = Inventory.search_items!("", actor: user)
+      assert walnuts.tracking == :level
+      assert walnuts.stock_level == :low
+    end
+
+    test "sets a starting count for count items", %{conn: conn, user: user} do
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+      view |> form("#search-form", search: %{query: "Apples"}) |> render_change()
+      view |> element("#add-item button") |> render_click()
+
+      view |> form("#new-item-form", item: %{tracking: "count"}) |> render_change()
+      view |> form("#new-item-form", item: %{stock_count: "6"}) |> render_submit()
+
+      [apples] = Inventory.search_items!("", actor: user)
+      assert apples.tracking == :count
+      assert apples.stock_count == 6
+    end
+
+    test "pressing enter in the search adds the name as a level item", %{conn: conn, user: user} do
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> form("#search-form", search: %{query: "Walnuts"}) |> render_submit()
+
+      [walnuts] = Inventory.search_items!("", actor: user)
+      assert to_string(walnuts.name) == "Walnuts"
+      assert walnuts.tracking == :level
+      assert walnuts.stock_level == :plenty
+      assert has_element?(view, "#item-#{walnuts.id}")
+      refute has_element?(view, "#add-item")
+    end
+
+    test "pressing enter on an existing name adds nothing", %{conn: conn, user: user} do
+      item(user, %{name: "Walnuts"})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> form("#search-form", search: %{query: "walnuts"}) |> render_submit()
+
+      assert [_one] = Inventory.search_items!("", actor: user)
+    end
+
     test "opens with the emoji field focused and no example emoji", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/inventory")
       view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()

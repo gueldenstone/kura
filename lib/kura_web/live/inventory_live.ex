@@ -24,12 +24,34 @@ defmodule KuraWeb.InventoryLive do
      socket |> assign(query: query, new_form: nil) |> assign_search_form() |> load_items()}
   end
 
+  def handle_event("quick_add", %{"search" => %{"query" => query}}, socket) do
+    socket = socket |> assign(query: query, new_form: nil) |> load_items()
+    name = String.trim(query)
+
+    if show_add_prompt?(query, socket.assigns.items) do
+      case Inventory.create_item(%{name: name, tracking: :level}, actor: actor(socket)) do
+        {:ok, _item} ->
+          {:noreply, socket |> assign(query: "") |> assign_search_form() |> load_items()}
+
+        {:error, _error} ->
+          {:noreply, put_flash(socket, :error, "Could not add “#{name}”")}
+      end
+    else
+      {:noreply, assign_search_form(socket)}
+    end
+  end
+
   def handle_event("open_add", _params, socket) do
     form =
       AshPhoenix.Form.for_create(Item, :create,
         as: "item",
         actor: actor(socket),
-        params: %{"name" => String.trim(socket.assigns.query), "tracking" => "count"}
+        params: %{
+          "name" => String.trim(socket.assigns.query),
+          "tracking" => "level",
+          "stock_level" => "plenty",
+          "stock_count" => "1"
+        }
       )
 
     {:noreply, assign(socket, new_form: to_form(form))}
@@ -205,7 +227,13 @@ defmodule KuraWeb.InventoryLive do
     >
       <h1 class="font-display text-4xl leading-none font-bold tracking-tight">Inventory</h1>
 
-      <.form for={@search_form} id="search-form" phx-change="search" phx-submit="search" class="mt-5">
+      <.form
+        for={@search_form}
+        id="search-form"
+        phx-change="search"
+        phx-submit="quick_add"
+        class="mt-5"
+      >
         <div class="relative">
           <.icon
             name="hero-magnifying-glass"
