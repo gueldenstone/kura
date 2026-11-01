@@ -17,6 +17,16 @@ Offline was the riskiest requirement, so it was verified first. The spike passed
 
 The MVP is complete and deployed. Changes from real-world use are collected in `docs/feedback.md` and worked on as a batch.
 
+## Next
+
+Planned features after the MVP, in order.
+
+| # | Milestone | Content | Status |
+|---|-----------|---------|--------|
+| 7 | Label CSV export | Select inventory items and download their names as a plain CSV with the column header `Label`, for label printing | Next |
+| 8 | Optional replenishment | Per item: auto-replenish or not. Auto-replenish items go on the shopping list when marked empty; other items ask for confirmation first, since they are not regular stock | Planned |
+| 9 | Inventory check mode | Each item tracks when its stock last changed. A guided mode walks through the stalest items, asks to confirm the current stock and offers a quick way to update it | Planned |
+
 ## After the MVP (unordered ideas)
 
 - Low-stock thresholds for count items that auto-add to the list
