@@ -238,10 +238,13 @@ defmodule Kura.Inventory.Item do
   @doc "The string that stands for a set of tag ids in `tag_key`."
   def tag_key(tag_ids), do: tag_ids |> Enum.map(&to_string/1) |> Enum.sort() |> Enum.join(",")
 
-  @doc "The tags of a loaded item as one line, in alphabetical order: `ground · Bio`."
-  def tag_line(%{tags: tags}) do
-    tags |> Enum.map(&to_string(&1.name)) |> Enum.sort_by(&String.downcase/1) |> Enum.join(" · ")
+  @doc "The tag names of a loaded item, in alphabetical order."
+  def tag_names(%{tags: tags}) do
+    tags |> Enum.map(&to_string(&1.name)) |> Enum.sort_by(&String.downcase/1)
   end
+
+  @doc "The tags of a loaded item as one line, in alphabetical order: `ground · Bio`."
+  def tag_line(item), do: item |> tag_names() |> Enum.join(" · ")
 
   @doc "The name and the tags of a loaded item as one piece of text, as printed on a label."
   def label(%{name: name} = item) do

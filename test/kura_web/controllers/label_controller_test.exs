@@ -25,19 +25,33 @@ defmodule KuraWeb.LabelControllerTest do
       assert disposition =~ ~s(attachment; filename="labels.csv")
     end
 
-    test "puts the tags on the label", %{conn: conn} do
+    test "prints the tags that set items of the same name apart and skips switched-off ones", %{
+      conn: conn
+    } do
       %{conn: conn, user: user} = log_in_user(%{conn: conn})
+      hot = Inventory.create_tag!(%{name: "hot"}, actor: user)
+      sweet = Inventory.create_tag!(%{name: "sweet"}, actor: user)
       ground = Inventory.create_tag!(%{name: "ground"}, actor: user)
+      red = Inventory.create_tag!(%{name: "red", print_on_labels: false}, actor: user)
 
-      cumin =
+      paprika = fn tags ->
         Inventory.create_item!(
-          %{name: "Cumin", tracking: :level, tag_ids: [ground.id]},
+          %{name: "Paprika", tracking: :level, tag_ids: Enum.map(tags, & &1.id)},
+          actor: user
+        )
+      end
+
+      first = paprika.([hot, ground, red])
+      second = paprika.([sweet, ground])
+
+      unique =
+        Inventory.create_item!(%{name: "Salt", tracking: :level, tag_ids: [ground.id]},
           actor: user
         )
 
-      conn = get(conn, ~p"/inventory/labels.csv", ids: [cumin.id])
+      conn = get(conn, ~p"/inventory/labels.csv", ids: [first.id, second.id, unique.id])
 
-      assert response(conn, 200) == "Label\r\nCumin ground\r\n"
+      assert response(conn, 200) == "Label\r\nPaprika hot\r\nPaprika sweet\r\nSalt\r\n"
     end
 
     test "ignores unknown and malformed ids", %{conn: conn} do

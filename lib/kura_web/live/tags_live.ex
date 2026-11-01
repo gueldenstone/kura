@@ -158,6 +158,13 @@ defmodule KuraWeb.TagsLive do
               class="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1.5 text-left transition active:opacity-70"
             >
               <span class="truncate text-[17px] font-bold">{tag.name}</span>
+              <span
+                :if={!tag.print_on_labels}
+                data-role="not-printed"
+                class="shrink-0 rounded-full bg-base-300/60 px-2 py-0.5 text-[11px] font-bold text-base-content/55"
+              >
+                not printed
+              </span>
             </button>
             <span data-role="item-count" class="shrink-0 text-sm text-base-content/55">
               {items_label(tag.item_count)}
@@ -183,7 +190,26 @@ defmodule KuraWeb.TagsLive do
             class="mt-2 mb-1 space-y-1 rounded-2xl bg-base-200 p-4"
           >
             <.input field={@edit_form[:name]} type="text" label="Name" />
-            <div class="flex items-center gap-2 pt-2">
+            <label class="flex cursor-pointer items-center justify-between gap-4 pt-3">
+              <span class="min-w-0">
+                <span class="block font-bold">Print on labels</span>
+                <span class="block text-[13px] text-base-content/55">
+                  Turn off if you can see it by looking at the container
+                </span>
+              </span>
+              <input type="hidden" name="tag[print_on_labels]" value="false" />
+              <input
+                type="checkbox"
+                name="tag[print_on_labels]"
+                value="true"
+                checked={
+                  Phoenix.HTML.Form.normalize_value("checkbox", @edit_form[:print_on_labels].value)
+                }
+                class="peer sr-only"
+              />
+              <span class="relative h-8 w-14 shrink-0 rounded-full bg-base-300 transition peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 after:absolute after:top-1 after:left-1 after:size-6 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-6 motion-reduce:transition-none"></span>
+            </label>
+            <div class="flex items-center gap-2 pt-3">
               <button type="submit" class="btn btn-primary rounded-full">Save</button>
               <button
                 type="button"

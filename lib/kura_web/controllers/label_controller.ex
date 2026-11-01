@@ -11,12 +11,14 @@ defmodule KuraWeb.LabelController do
 
   def export(conn, params) do
     ids = params |> Map.get("ids", []) |> List.wrap() |> Enum.filter(&valid_id?/1)
-    items = Inventory.list_items_by_ids!(ids, actor: conn.assigns.current_user)
+    actor = conn.assigns.current_user
+    items = Inventory.list_items_by_ids!(ids, actor: actor)
+    inventory = Inventory.search_items!("", actor: actor)
 
     conn
     |> put_resp_content_type("text/csv")
     |> put_resp_header("content-disposition", ~s(attachment; filename="labels.csv"))
-    |> send_resp(200, LabelExport.csv(items))
+    |> send_resp(200, LabelExport.csv(items, inventory))
   end
 
   defp valid_id?(id), do: is_binary(id) and match?({:ok, _}, Ecto.UUID.cast(id))

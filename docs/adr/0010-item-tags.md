@@ -11,9 +11,10 @@ The same ingredient comes in forms: ground cumin and whole cumin, green and blac
 - An item's **identity is its name plus its set of tags**. SQLite has no set type, so the item stores `tag_key`, the sorted tag ids joined into one string (empty without tags), and the unique identity is `[:name, :tag_key]` with `pre_check?`. This replaces the unique name identity of ADR 0005. `Item.Changes.SetTags` recomputes the key whenever the `tag_ids` argument of create or update is given, in the same action that replaces the relationship. An update without `tag_ids` leaves tags and key alone.
 - Renaming a tag changes how items display, never their identity, because the key holds ids.
 - Deleting a tag takes it off its items and rewrites their `tag_key`. If that would make two items identical, the delete is refused and the error names the items (`Tag.Changes.RemoveFromItems`).
-- The tags of an item are shown as a small line under its name, alphabetically, joined with ` · `. The label (name and tags, as one string, `Item.label/1`) is what the label export prints and what the offline copy shows as the name.
+- The tags of an item are shown as a small line under its name, alphabetically, joined with ` · `. The label (name and tags, as one string, `Item.label/1`) is what the offline copy shows as the name; the label export has its own rule for which tags go after the name (below).
 - Search matches when every word of the query is part of the name or of a tag. The inventory orders items by name, then by tag line, ignoring case; SQLite alone would sort capital letters first.
 - Typing "cumin ground" in the inventory search offers to add "cumin" with the tag "ground": words equal to a tag name become tags.
+- For label printing, each tag has a `print_on_labels` switch (on by default). The export prints a tag only if the switch is on and not every item with the same name has it, compared across the whole inventory, so the labels carry what tells items apart and nothing a person sees by looking at the jar.
 - The tags page lives behind a "More" entry (three dots) in the bottom bar, so the bar keeps its three main tabs.
 
 ## Consequences

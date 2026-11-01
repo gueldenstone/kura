@@ -20,7 +20,7 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 - The inventory, shopping list and check cards show the tags as a small grey line under the name. Items with the same name are ordered by their tags. Search matches the name or any tag, word by word.
 - Tags are picked in the item's add and edit forms with a searchable picker; typing a new name offers to create the tag on the spot, and Enter takes the only match. Typing "cumin ground" in the inventory search offers to add "cumin" with the tag "ground".
 - The **Tags** page (`/tags`, behind the three-dots **More** entry of the bottom bar) lists the tags with their number of items and lets you add, rename and delete them. Deleting a tag takes it off its items; it is refused when that would make two items identical.
-- The label export prints the name and the tags of each selected item on one line.
+- The label export writes the tags worth printing after the name in its `Label` column (see Label export).
 
 ### Stock
 - View the full inventory, with the current stock of each item.
@@ -37,7 +37,8 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 
 ### Label export
 - **Select** in the inventory switches to select mode: every row gets a checkbox in place of its stock control, search keeps working and the ticks stay, **Select all** ticks every visible item and **Select none** clears all ticks.
-- **Export labels** downloads `labels.csv` with a `Label` header and one item name per line, ordered by name, for import into label printing software (Brother P-touch). Online only.
+- **Export labels** downloads `labels.csv` with one column, `Label`: the item name followed by the tags worth printing, separated by spaces (for example `Paprika scharf`), one item per line ordered by name and then by those tags, for import into label printing software (Brother P-touch). Online only.
+- **Which tags print:** a tag is exported only if its **Print on labels** switch (per tag, on by default, in the tag's card on the Tags page; a tag that is off shows "not printed" in the list) is on, and not every item in the inventory with the same name has it. So an item with a unique name prints no tags, and "ground" on both of two paprikas stays off while "hot" and "sweet" print. The comparison covers the whole inventory, not just the selected items. The app shows all tags everywhere else.
 
 ### Shopping list
 - Entries have an item and a quantity.

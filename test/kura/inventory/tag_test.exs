@@ -51,6 +51,15 @@ defmodule Kura.Inventory.TagTest do
              actor |> then(&Inventory.list_tags!(actor: &1)) |> Enum.map(&to_string(&1.name))
   end
 
+  test "tags are printed on labels unless switched off", %{actor: actor} do
+    assert tag(actor, "ground").print_on_labels
+
+    red = Inventory.create_tag!(%{name: "red", print_on_labels: false}, actor: actor)
+    refute red.print_on_labels
+
+    assert Inventory.update_tag!(red, %{print_on_labels: true}, actor: actor).print_on_labels
+  end
+
   describe "items and their tags" do
     test "the same name with different tags makes different items", %{actor: actor} do
       ground = tag(actor, "ground")

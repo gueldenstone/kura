@@ -33,12 +33,12 @@ defmodule Kura.Inventory.Tag do
 
     create :create do
       primary? true
-      accept [:name]
+      accept [:name, :print_on_labels]
     end
 
     update :update do
       primary? true
-      accept [:name]
+      accept [:name, :print_on_labels]
     end
 
     destroy :destroy do
@@ -72,6 +72,13 @@ defmodule Kura.Inventory.Tag do
       allow_nil? false
       public? true
       constraints min_length: 1, trim?: true
+    end
+
+    attribute :print_on_labels, :boolean do
+      description "Turn off for tags that can be seen by looking at the container; they are never exported for labels."
+      allow_nil? false
+      public? true
+      default true
     end
 
     timestamps()

@@ -60,6 +60,27 @@ defmodule KuraWeb.TagsLiveTest do
     refute has_element?(view, "#edit-tag-form")
   end
 
+  test "switches printing on labels off and on, and says so in the list", %{
+    conn: conn,
+    user: user
+  } do
+    red = tag(user, "red")
+    {:ok, view, _html} = live(conn, ~p"/tags")
+    refute has_element?(view, "#tag-#{red.id} [data-role=not-printed]")
+
+    view |> element("#tag-#{red.id} button[phx-click=edit]") |> render_click()
+    view |> form("#edit-tag-form", tag: %{print_on_labels: false}) |> render_submit()
+
+    refute Inventory.get_tag!(red.id, actor: user).print_on_labels
+    assert has_element?(view, "#tag-#{red.id} [data-role=not-printed]", "not printed")
+
+    view |> element("#tag-#{red.id} button[phx-click=edit]") |> render_click()
+    view |> form("#edit-tag-form", tag: %{print_on_labels: true}) |> render_submit()
+
+    assert Inventory.get_tag!(red.id, actor: user).print_on_labels
+    refute has_element?(view, "#tag-#{red.id} [data-role=not-printed]")
+  end
+
   test "deletes a tag and takes it off its items", %{conn: conn, user: user} do
     ground = tag(user, "ground")
     bio = tag(user, "Bio")
