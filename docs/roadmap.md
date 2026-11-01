@@ -28,6 +28,7 @@ Planned features after the MVP, in order.
 | 9 | Inventory check mode | Each item tracks when its stock last changed. A guided mode walks through the stalest items, asks to confirm the current stock and offers a quick way to update it | Done |
 | 10 | Tags | Shared, user-extendable tags tell items apart (ADR 0010): searchable picker in the item forms, a Tags page behind a three-dots More entry in the bottom bar, tags shown under item names, in search, check cards, the shopping list and on labels | Done |
 | 11 | Locations | Shared, user-extendable locations (cupboards, drawers, fridge), several per item; the Check tab picks one location and walks its items, with a hint when an item is also somewhere else (specification in `docs/locations.md`) | Done |
+| 12 | QR codes on containers | A short code per item, a `Link` column in the label export for QR labels, a quick-update page behind the link and a Scan button in the app (specification in `docs/qr-codes.md`) | On hold |
 
 ## After the MVP (unordered ideas)
 
@@ -37,5 +38,5 @@ Planned features after the MVP, in order.
 - Wider offline editing (stock changes, list edits)
 - Units for quantities (kg, packs)
 - Expiry dates
-- Barcode scanning
+- Barcode scanning of products (considered 2026-11-01 and not wanted: shopping goes by the list and checking off restocks, so scanning after the trip would only repeat that for the few manual items; if ever revisited, share the scanner with the QR codes, `docs/qr-codes.md`)
 - Recipes and meal planning
