@@ -12,6 +12,7 @@ defmodule Kura.Inventory do
       define :delete_item, action: :destroy
       define :get_item, action: :read, get_by: :id
       define :search_items, action: :search, args: [:query]
+      define :list_items_by_ids, action: :by_ids, args: [:ids]
       define :change_item_count, action: :change_count, args: [:delta]
       define :set_item_count, action: :set_count, args: [:count]
       define :set_item_level, action: :set_level, args: [:level]

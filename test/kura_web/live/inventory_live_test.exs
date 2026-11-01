@@ -361,4 +361,64 @@ defmodule KuraWeb.InventoryLiveTest do
       assert Inventory.search_items!("", actor: user) == []
     end
   end
+
+  describe "selecting items for label export" do
+    test "ticking rows counts them and the export form carries their ids", %{
+      conn: conn,
+      user: user
+    } do
+      apples = item(user, %{name: "Apples"})
+      walnuts = item(user, %{name: "Walnuts", tracking: :level})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      refute has_element?(view, "#export-form")
+      view |> element("#start-select") |> render_click()
+
+      assert has_element?(view, "#export-form [data-role=selected-count]", "0 selected")
+      assert has_element?(view, "#export-form button[disabled]")
+      refute has_element?(view, "#item-#{apples.id} [data-role=stock]")
+
+      view |> element("#item-#{apples.id} button[role=checkbox]") |> render_click()
+
+      assert has_element?(view, "#export-form [data-role=selected-count]", "1 selected")
+      assert has_element?(view, ~s(#export-form input[name="ids[]"][value="#{apples.id}"]))
+      refute has_element?(view, ~s(#export-form input[value="#{walnuts.id}"]))
+      assert has_element?(view, "#item-#{apples.id} button[aria-checked=true]")
+
+      view |> element("#item-#{apples.id} button[role=checkbox]") |> render_click()
+      assert has_element?(view, "#export-form [data-role=selected-count]", "0 selected")
+    end
+
+    test "the selection survives searching", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples"})
+      item(user, %{name: "Walnuts"})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#start-select") |> render_click()
+      view |> element("#item-#{apples.id} button[role=checkbox]") |> render_click()
+      view |> form("#search-form", search: %{query: "wal"}) |> render_change()
+
+      assert has_element?(view, "#export-form [data-role=selected-count]", "1 selected")
+      view |> element("#select-all") |> render_click()
+      assert has_element?(view, "#export-form [data-role=selected-count]", "2 selected")
+
+      view |> element("#select-none") |> render_click()
+      assert has_element?(view, "#export-form [data-role=selected-count]", "0 selected")
+    end
+
+    test "cancelling leaves select mode and clears the ticks", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples"})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#start-select") |> render_click()
+      view |> element("#item-#{apples.id} button[role=checkbox]") |> render_click()
+      view |> element("#stop-select") |> render_click()
+
+      refute has_element?(view, "#export-form")
+      assert has_element?(view, "#item-#{apples.id} [data-role=stock]")
+
+      view |> element("#start-select") |> render_click()
+      assert has_element?(view, "#export-form [data-role=selected-count]", "0 selected")
+    end
+  end
 end

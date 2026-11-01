@@ -12,6 +12,7 @@ defmodule KuraWeb.InventoryLive do
       socket
       |> assign(:page_title, "Inventory")
       |> assign(query: "", new_form: nil, editing: nil, edit_form: nil, undo: nil)
+      |> assign(selecting?: false, selected: MapSet.new())
       |> assign_search_form()
       |> load_items()
 
@@ -32,6 +33,42 @@ defmodule KuraWeb.InventoryLive do
     else
       {:noreply, socket}
     end
+  end
+
+  def handle_event("start_select", _params, socket) do
+    {:noreply,
+     assign(socket,
+       selecting?: true,
+       selected: MapSet.new(),
+       new_form: nil,
+       editing: nil,
+       edit_form: nil,
+       undo: nil
+     )}
+  end
+
+  def handle_event("stop_select", _params, socket) do
+    {:noreply, assign(socket, selecting?: false, selected: MapSet.new())}
+  end
+
+  def handle_event("toggle_select", %{"id" => id}, socket) do
+    selected = socket.assigns.selected
+
+    selected =
+      if MapSet.member?(selected, id),
+        do: MapSet.delete(selected, id),
+        else: MapSet.put(selected, id)
+
+    {:noreply, assign(socket, selected: selected)}
+  end
+
+  def handle_event("select_all", _params, socket) do
+    visible = MapSet.new(socket.assigns.items, & &1.id)
+    {:noreply, assign(socket, selected: MapSet.union(socket.assigns.selected, visible))}
+  end
+
+  def handle_event("select_none", _params, socket) do
+    {:noreply, assign(socket, selected: MapSet.new())}
   end
 
   def handle_event("open_add", _params, socket), do: {:noreply, open_add_form(socket)}
@@ -233,7 +270,44 @@ defmodule KuraWeb.InventoryLive do
       active={:inventory}
       open_count={@open_count}
     >
-      <h1 class="font-display text-4xl leading-none font-bold tracking-tight">Inventory</h1>
+      <div class="flex items-center justify-between gap-3">
+        <h1 class="font-display text-4xl leading-none font-bold tracking-tight">Inventory</h1>
+        <button
+          :if={!@selecting? and @items != []}
+          type="button"
+          id="start-select"
+          phx-click="start_select"
+          class="h-9 rounded-full bg-base-300/60 px-4 text-[13px] font-bold transition hover:bg-base-300 active:scale-95"
+        >
+          Select
+        </button>
+      </div>
+      <div :if={@selecting?} class="mt-3 flex items-center gap-1.5">
+        <button
+          type="button"
+          id="select-all"
+          phx-click="select_all"
+          class="h-9 rounded-full bg-base-300/60 px-4 text-[13px] font-bold transition hover:bg-base-300 active:scale-95"
+        >
+          Select all
+        </button>
+        <button
+          type="button"
+          id="select-none"
+          phx-click="select_none"
+          class="h-9 rounded-full bg-base-300/60 px-4 text-[13px] font-bold transition hover:bg-base-300 active:scale-95"
+        >
+          Select none
+        </button>
+        <button
+          type="button"
+          id="stop-select"
+          phx-click="stop_select"
+          class="h-9 rounded-full px-3 text-[13px] font-bold text-base-content/60 transition hover:text-base-content active:scale-95"
+        >
+          Cancel
+        </button>
+      </div>
 
       <.form
         for={@search_form}
@@ -285,7 +359,32 @@ defmodule KuraWeb.InventoryLive do
           id={"item-#{item.id}"}
           class="rounded-box bg-base-100 py-2 pr-2.5 pl-4 shadow-card"
         >
-          <div class="flex items-center gap-3">
+          <div :if={@selecting?} class="flex items-center gap-3">
+            <button
+              type="button"
+              phx-click="toggle_select"
+              phx-value-id={item.id}
+              role="checkbox"
+              aria-checked={to_string(MapSet.member?(@selected, item.id))}
+              aria-label={"Select #{item.name}"}
+              class="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1.5 text-left transition active:opacity-70"
+            >
+              <span class={[
+                "grid size-6 shrink-0 place-items-center rounded-full border-2 transition",
+                MapSet.member?(@selected, item.id) && "border-primary bg-primary text-primary-content",
+                !MapSet.member?(@selected, item.id) && "border-base-content/30"
+              ]}>
+                <.icon
+                  :if={MapSet.member?(@selected, item.id)}
+                  name="hero-check-micro"
+                  class="size-4"
+                />
+              </span>
+              <span class="truncate text-[17px] font-bold">{item.name}</span>
+            </button>
+          </div>
+
+          <div :if={!@selecting?} class="flex items-center gap-3">
             <button
               type="button"
               phx-click="edit"
@@ -312,7 +411,7 @@ defmodule KuraWeb.InventoryLive do
           </div>
 
           <.form
-            :if={@editing == item.id}
+            :if={!@selecting? and @editing == item.id}
             for={@edit_form}
             id="edit-item-form"
             phx-change="validate_edit"
@@ -343,6 +442,27 @@ defmodule KuraWeb.InventoryLive do
           </.form>
         </li>
       </ul>
+
+      <.form
+        :if={@selecting?}
+        for={%{}}
+        as={:export}
+        id="export-form"
+        method="get"
+        action={~p"/inventory/labels.csv"}
+        class="fixed inset-x-4 bottom-24 z-20 mx-auto flex max-w-md items-center justify-between gap-3 rounded-box bg-neutral px-5 py-3 text-sm font-semibold text-neutral-content shadow-2xl"
+      >
+        <input :for={id <- @selected} type="hidden" name="ids[]" value={id} />
+        <span data-role="selected-count">{MapSet.size(@selected)} selected</span>
+        <button
+          type="submit"
+          phx-click="stop_select"
+          disabled={MapSet.size(@selected) == 0}
+          class="h-9 rounded-full bg-primary px-4 text-[13px] font-extrabold tracking-wide text-primary-content uppercase transition active:scale-95 disabled:opacity-40"
+        >
+          Export labels
+        </button>
+      </.form>
 
       <div
         :if={@undo}

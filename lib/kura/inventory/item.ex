@@ -98,6 +98,15 @@ defmodule Kura.Inventory.Item do
 
       prepare build(sort: [name: :asc])
     end
+
+    read :by_ids do
+      description "The items with the given ids, by name. Ids that match no item are ignored."
+      argument :ids, {:array, :uuid}, allow_nil?: false
+
+      filter expr(id in ^arg(:ids))
+
+      prepare build(sort: [name: :asc])
+    end
   end
 
   policies do

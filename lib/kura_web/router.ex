@@ -42,6 +42,7 @@ defmodule KuraWeb.Router do
 
     # Home screen shortcuts saved before the list moved to "/" still point here.
     get "/shopping-list", PageController, :shopping_list
+    get "/inventory/labels.csv", LabelController, :export
     auth_routes AuthController, Kura.Accounts.User, path: "/auth"
 
     sign_out_route AuthController, "/sign-out",
