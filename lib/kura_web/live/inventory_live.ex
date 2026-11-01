@@ -6,6 +6,8 @@ defmodule KuraWeb.InventoryLive do
   alias Kura.Inventory
   alias Kura.Inventory.{Item, ShoppingList}
 
+  @undo_timeout 10_000
+
   @impl true
   def mount(_params, _session, socket) do
     socket =
@@ -173,7 +175,7 @@ defmodule KuraWeb.InventoryLive do
         end
 
       undo = %{undo | offer_list?: false, added_entry: added}
-      {:noreply, socket |> assign(undo: undo) |> load_items()}
+      {:noreply, socket |> show_undo(undo) |> load_items()}
     end)
   end
 
@@ -192,6 +194,10 @@ defmodule KuraWeb.InventoryLive do
   @impl true
   def handle_info(%Phoenix.Socket.Broadcast{topic: "kitchen:changed"}, socket) do
     {:noreply, load_items(socket)}
+  end
+
+  def handle_info({:expire_undo, ref}, %{assigns: %{undo: %{ref: ref}}} = socket) do
+    {:noreply, assign(socket, undo: nil)}
   end
 
   def handle_info(_message, socket), do: {:noreply, socket}
@@ -254,7 +260,30 @@ defmodule KuraWeb.InventoryLive do
       offer_list?: !marked.auto_replenish
     }
 
-    {:noreply, socket |> assign(undo: undo) |> load_items()}
+    {:noreply, socket |> show_undo(undo) |> load_items()}
+  end
+
+  # The undo bar goes away on its own; a newer bar is not closed by an older timer.
+  defp show_undo(socket, undo) do
+    ref = make_ref()
+    Process.send_after(self(), {:expire_undo, ref}, @undo_timeout)
+    assign(socket, undo: Map.put(undo, :ref, ref))
+  end
+
+  # Bars at the bottom of the screen slide up and fade in, and drop back out when they go.
+  defp slide_in do
+    JS.transition(
+      {"ease-out duration-300", "translate-y-3 opacity-0", "translate-y-0 opacity-100"},
+      time: 300
+    )
+  end
+
+  defp slide_out do
+    JS.hide(
+      transition:
+        {"ease-in duration-200", "translate-y-0 opacity-100", "translate-y-3 opacity-0"},
+      time: 200
+    )
   end
 
   defp previous_stock(%Item{tracking: :count, stock_count: count}), do: {:count, count}
@@ -473,9 +502,11 @@ defmodule KuraWeb.InventoryLive do
         for={%{}}
         as={:export}
         id="export-form"
+        phx-mounted={slide_in()}
+        phx-remove={slide_out()}
         method="get"
         action={~p"/inventory/labels.csv"}
-        class="fixed inset-x-4 bottom-24 z-20 mx-auto flex max-w-md items-center justify-between gap-3 rounded-box bg-neutral px-5 py-3 text-sm font-semibold text-neutral-content shadow-2xl"
+        class="motion-reduce:transition-none fixed inset-x-4 bottom-24 z-20 mx-auto flex max-w-md items-center justify-between gap-3 rounded-box bg-neutral px-5 py-3 text-sm font-semibold text-neutral-content shadow-2xl"
       >
         <input :for={id <- @selected} type="hidden" name="ids[]" value={id} />
         <span data-role="selected-count">{MapSet.size(@selected)} selected</span>
@@ -492,7 +523,9 @@ defmodule KuraWeb.InventoryLive do
       <div
         :if={@undo}
         id="undo"
-        class="fixed inset-x-4 bottom-24 z-20 mx-auto flex max-w-md items-center justify-between gap-3 rounded-box bg-neutral px-5 py-3.5 text-sm font-semibold text-neutral-content shadow-2xl"
+        phx-mounted={slide_in()}
+        phx-remove={slide_out()}
+        class="motion-reduce:transition-none fixed inset-x-4 bottom-24 z-20 mx-auto flex max-w-md items-center justify-between gap-3 rounded-box bg-neutral px-5 py-3.5 text-sm font-semibold text-neutral-content shadow-2xl"
         role="status"
       >
         <span class="truncate">{@undo.name} marked empty</span>

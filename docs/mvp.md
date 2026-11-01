@@ -17,7 +17,7 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 ### Stock
 - View the full inventory, with the current stock of each item.
 - Adjust stock (set a count, set a level).
-- **Mark empty** in one tap. Items with **auto-replenish** on (stock such as spices, pasta, canned goods) are added to the shopping list with their usual amount, unless already on it; the Undo bar takes the entry off again. For other items (one-offs, auto-replenish is off by default) the item is only marked empty and the Undo bar also offers **Add to list**; ignoring it leaves the item off the list.
+- **Mark empty** in one tap. Items with **auto-replenish** on (stock such as spices, pasta, canned goods) are added to the shopping list with their usual amount, unless already on it; the Undo bar takes the entry off again. For other items (one-offs, auto-replenish is off by default) the item is only marked empty and the Undo bar also offers **Add to list**; ignoring it leaves the item off the list. The bar slides away by itself after 10 seconds (restarted by Add to list).
 - Each inventory row is one line: the name (tap to edit) and one stock control. Level items use a Plenty / Low / Empty selector, count items a minus / number / plus stepper next to a separate Empty button; stepping a count down to 0 also marks it empty.
 - Items that are on the list carry a small cart marker in the inventory.
 

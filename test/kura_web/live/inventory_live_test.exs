@@ -119,6 +119,26 @@ defmodule KuraWeb.InventoryLiveTest do
       assert Inventory.list_open_entries!(actor: user) == []
     end
 
+    test "the undo bar goes away on its own, and an old timer does not close a newer bar", %{
+      conn: conn,
+      user: user
+    } do
+      apples = item(user, %{name: "Apples", stock_count: 1})
+      pears = item(user, %{name: "Pears", stock_count: 1})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+      undo_ref = fn -> :sys.get_state(view.pid).socket.assigns.undo.ref end
+
+      view |> element("#item-#{apples.id} button[aria-label='One less']") |> render_click()
+      first = undo_ref.()
+      view |> element("#item-#{pears.id} button[aria-label='One less']") |> render_click()
+
+      send(view.pid, {:expire_undo, first})
+      assert has_element?(view, "#undo", "Pears")
+
+      send(view.pid, {:expire_undo, undo_ref.()})
+      refute has_element?(view, "#undo")
+    end
+
     test "an item that auto-replenishes is listed without a question", %{conn: conn, user: user} do
       apples = item(user, %{name: "Apples", stock_count: 1})
       {:ok, view, _html} = live(conn, ~p"/inventory")
