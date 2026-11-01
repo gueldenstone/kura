@@ -4,12 +4,12 @@ defmodule KuraWeb.AuthTest do
   import Phoenix.LiveViewTest
 
   describe "when logged out" do
-    test "/ redirects to the sign-in page", %{conn: conn} do
+    test "the app pages redirect to the sign-in page", %{conn: conn} do
       assert redirected_to(get(conn, ~p"/")) == ~p"/sign-in"
     end
 
-    test "app pages redirect to the sign-in page", %{conn: conn} do
-      for path <- [~p"/shopping-list", ~p"/inventory"] do
+    test "app pages redirect to the sign-in page in LiveView too", %{conn: conn} do
+      for path <- [~p"/", ~p"/inventory"] do
         assert {:error, {:redirect, %{to: "/sign-in"}}} = live(conn, path)
       end
     end
@@ -44,7 +44,8 @@ defmodule KuraWeb.AuthTest do
       conn = submit_form(form, conn)
 
       assert redirected_to(conn) == ~p"/"
-      assert redirected_to(get(recycle(conn), ~p"/")) == ~p"/shopping-list"
+      assert {:ok, _view, html} = live(recycle(conn), ~p"/")
+      assert html =~ "Shopping list"
     end
 
     test "with a wrong password stays signed out", %{conn: conn} do
@@ -67,8 +68,13 @@ defmodule KuraWeb.AuthTest do
   describe "when logged in" do
     setup :log_in_user
 
-    test "/ redirects to the shopping list", %{conn: conn} do
-      assert redirected_to(get(conn, ~p"/")) == ~p"/shopping-list"
+    test "/ is the shopping list itself, not a redirect", %{conn: conn} do
+      assert {:ok, _view, html} = live(conn, ~p"/")
+      assert html =~ "Shopping list"
+    end
+
+    test "the old /shopping-list address redirects to /", %{conn: conn} do
+      assert redirected_to(get(conn, "/shopping-list")) == ~p"/"
     end
 
     test "the sign-in page redirects into the app", %{conn: conn} do
@@ -77,13 +83,13 @@ defmodule KuraWeb.AuthTest do
 
     test "both app pages render with the navigation", %{conn: conn} do
       for {path, heading} <- [
-            {~p"/shopping-list", "Shopping list"},
+            {~p"/", "Shopping list"},
             {~p"/inventory", "Inventory"}
           ] do
         {:ok, view, html} = live(conn, path)
 
         assert html =~ heading
-        assert has_element?(view, ~s|nav a[href="/shopping-list"]|, "Shopping list")
+        assert has_element?(view, ~s|nav a[href="/"]|, "Shopping list")
         assert has_element?(view, ~s|nav a[href="/inventory"]|, "Inventory")
         assert has_element?(view, ~s|a[href="/sign-out"][data-method="delete"]|)
       end

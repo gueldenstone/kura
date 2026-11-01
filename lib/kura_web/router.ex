@@ -32,7 +32,7 @@ defmodule KuraWeb.Router do
 
     ash_authentication_live_session :authenticated_routes,
       on_mount: [{KuraWeb.LiveUserAuth, :live_user_required}, KuraWeb.LiveKitchenSync] do
-      live "/shopping-list", ShoppingListLive
+      live "/", ShoppingListLive
       live "/inventory", InventoryLive
     end
   end
@@ -40,7 +40,8 @@ defmodule KuraWeb.Router do
   scope "/", KuraWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    # Home screen shortcuts saved before the list moved to "/" still point here.
+    get "/shopping-list", PageController, :shopping_list
     auth_routes AuthController, Kura.Accounts.User, path: "/auth"
 
     sign_out_route AuthController, "/sign-out",

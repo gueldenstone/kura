@@ -214,7 +214,7 @@ defmodule KuraWeb.ShoppingListLive do
         Mark things empty in the inventory, or type above to add something.
       </p>
 
-      <ul id="open-entries" class="mt-4 grid gap-2.5">
+      <ul id="open-entries" class="mt-4 grid grid-cols-1 gap-2.5">
         <li
           :for={entry <- @open}
           id={"entry-#{entry.id}"}
@@ -283,7 +283,7 @@ defmodule KuraWeb.ShoppingListLive do
             Hide checked
           </button>
         </div>
-        <ul class="grid gap-2.5">
+        <ul class="grid grid-cols-1 gap-2.5">
           <li
             :for={entry <- @checked}
             id={"entry-#{entry.id}"}

@@ -266,7 +266,7 @@ defmodule KuraWeb.InventoryLive do
         No items yet. Type a name above to add your first one.
       </p>
 
-      <ul id="items" class="mt-5 grid gap-3">
+      <ul id="items" class="mt-5 grid grid-cols-1 gap-3">
         <li
           :for={item <- @items}
           id={"item-#{item.id}"}

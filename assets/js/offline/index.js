@@ -105,7 +105,7 @@ function mountOfflineView(root) {
     queue: loadQueue()
   }
 
-  const appPath = model.tab === "inventory" ? "/inventory" : "/shopping-list"
+  const appPath = model.tab === "inventory" ? "/inventory" : "/"
 
   const render = () => {
     if (!model.snapshot) {
@@ -135,7 +135,7 @@ function mountOfflineView(root) {
 
     if (action === "tab") {
       model.tab = tab
-      window.history.replaceState(null, "", tab === "inventory" ? "/inventory" : "/shopping-list")
+      window.history.replaceState(null, "", tab === "inventory" ? "/inventory" : "/")
     } else if (action === "check" || action === "uncheck") {
       model.queue = toggleChange(model.queue, action, id)
       saveQueue(model.queue)

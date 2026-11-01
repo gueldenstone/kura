@@ -61,7 +61,7 @@ defmodule KuraWeb.Layouts do
       >
         <div class="mx-auto grid max-w-2xl grid-cols-2 gap-2">
           <.tab
-            href={~p"/shopping-list"}
+            href={~p"/"}
             icon="hero-shopping-cart"
             active={@active == :shopping_list}
             badge={@open_count}

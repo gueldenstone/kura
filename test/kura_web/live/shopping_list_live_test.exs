@@ -18,7 +18,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
   defp stock(user, item), do: Inventory.get_item!(item.id, actor: user)
 
   test "shows a friendly message when there is nothing to buy", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/shopping-list")
+    {:ok, _view, html} = live(conn, ~p"/")
 
     assert html =~ "Nothing to buy"
   end
@@ -29,7 +29,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
     on_list(user, walnuts)
     entry = on_list(user, apples)
 
-    {:ok, view, html} = live(conn, ~p"/shopping-list")
+    {:ok, view, html} = live(conn, ~p"/")
 
     assert :binary.match(html, "Apples") < :binary.match(html, "Walnuts")
     assert has_element?(view, "#entry-#{entry.id} [data-role=quantity]", "6")
@@ -41,7 +41,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
     test "moves the entry to the cart and restocks a count item", %{conn: conn, user: user} do
       apples = item(user, %{name: "Apples", stock_count: 0})
       entry = on_list(user, apples, %{quantity: 4})
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
 
       view |> element("#entry-#{entry.id} button[phx-click=check]") |> render_click()
 
@@ -53,7 +53,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
     test "sets a level item to plenty", %{conn: conn, user: user} do
       walnuts = item(user, %{name: "Walnuts", tracking: :level, stock_level: :empty})
       entry = on_list(user, walnuts)
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
 
       view |> element("#entry-#{entry.id} button[phx-click=check]") |> render_click()
 
@@ -63,7 +63,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
     test "can be undone from the cart", %{conn: conn, user: user} do
       apples = item(user, %{name: "Apples", stock_count: 1})
       entry = on_list(user, apples, %{quantity: 4})
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
 
       view |> element("#entry-#{entry.id} button[phx-click=check]") |> render_click()
       view |> element("#cart #entry-#{entry.id} button[phx-click=uncheck]") |> render_click()
@@ -76,7 +76,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
     test "hide checked removes the cart for good", %{conn: conn, user: user} do
       apples = item(user, %{name: "Apples"})
       entry = on_list(user, apples)
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
       view |> element("#entry-#{entry.id} button[phx-click=check]") |> render_click()
 
       view |> element("button[phx-click=hide_checked]") |> render_click()
@@ -90,7 +90,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
   describe "quantity" do
     test "plus and minus change it", %{conn: conn, user: user} do
       entry = on_list(user, item(user, %{name: "Apples"}), %{quantity: 2})
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
 
       view |> element("#entry-#{entry.id} button[phx-value-delta='1']") |> render_click()
       assert has_element?(view, "#entry-#{entry.id} [data-role=quantity]", "3")
@@ -102,7 +102,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
     test "minus at 1 removes the entry without touching stock", %{conn: conn, user: user} do
       apples = item(user, %{name: "Apples", stock_count: 3})
       entry = on_list(user, apples, %{quantity: 1})
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
 
       view |> element("#entry-#{entry.id} button[phx-value-delta='-1']") |> render_click()
 
@@ -117,7 +117,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
       washing = item(user, %{name: "Washing-up liquid"})
       on_list(user, washing)
       item(user, %{name: "Rice"})
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
 
       view |> form("#search-form", search: %{query: "wa"}) |> render_change()
 
@@ -130,7 +130,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
       user: user
     } do
       apples = item(user, %{name: "Apples", usual_amount: 6})
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
 
       view |> form("#search-form", search: %{query: "app"}) |> render_change()
       view |> element("#suggestion-#{apples.id} button") |> render_click()
@@ -146,7 +146,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
       view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()
       view |> element("#add-item button") |> render_click()
 
@@ -163,7 +163,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
 
     test "does not offer to create a name that already exists", %{conn: conn, user: user} do
       on_list(user, item(user, %{name: "Walnuts"}))
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
 
       view |> form("#search-form", search: %{query: "walnuts"}) |> render_change()
 
@@ -174,7 +174,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
   describe "live updates" do
     test "an entry added elsewhere shows up", %{conn: conn, user: user} do
       walnuts = item(user, %{name: "Walnuts"})
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
       refute render(view) =~ "Walnuts"
 
       entry = on_list(user, walnuts)
@@ -184,7 +184,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
     end
 
     test "the Shopping list tab counts the open entries", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/shopping-list")
+      {:ok, view, _html} = live(conn, ~p"/")
       refute has_element?(view, "nav [data-role=open-count]")
 
       on_list(user, item(user, %{name: "Apples"}))
