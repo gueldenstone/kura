@@ -1,7 +1,8 @@
 defmodule Kura.Inventory.Item.Changes.PutOnList do
   @moduledoc """
-  After the action, puts the item on the shopping list unless it is already there. The entry that
-  was created, if any, is attached to the item as `__metadata__.added_entry` so callers can undo it.
+  After the action, puts an item that auto-replenishes on the shopping list unless it is already
+  there. The entry that was created, if any, is attached to the item as `__metadata__.added_entry`
+  so callers can undo it.
   """
   use Ash.Resource.Change
 
@@ -12,13 +13,16 @@ defmodule Kura.Inventory.Item.Changes.PutOnList do
     actor = Ash.Context.to_opts(context)[:actor]
 
     Ash.Changeset.after_action(changeset, fn _changeset, item ->
-      added =
-        case ShoppingList.put_on_list(item, actor) do
-          {:created, entry} -> entry
-          {:existing, _entry} -> nil
-        end
-
-      {:ok, Ash.Resource.put_metadata(item, :added_entry, added)}
+      {:ok, Ash.Resource.put_metadata(item, :added_entry, added_entry(item, actor))}
     end)
+  end
+
+  defp added_entry(%{auto_replenish: false}, _actor), do: nil
+
+  defp added_entry(item, actor) do
+    case ShoppingList.put_on_list(item, actor) do
+      {:created, entry} -> entry
+      {:existing, _entry} -> nil
+    end
   end
 end

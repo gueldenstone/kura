@@ -38,6 +38,7 @@ defmodule KuraWeb.InventoryComponents do
         options={[{"Plenty", :plenty}, {"Running low", :low}, {"Empty", :empty}]}
       />
       <.input field={@form[:usual_amount]} type="number" label="Usual amount to buy" min="1" />
+      <.input field={@form[:auto_replenish]} type="checkbox" label="Auto-replenish when empty" />
       <div class="flex gap-2 pt-2">
         <button type="submit" class="btn btn-primary rounded-full">Add item</button>
         <button type="button" phx-click="cancel_add" class="btn btn-ghost rounded-full">

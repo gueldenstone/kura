@@ -24,8 +24,8 @@ Planned features after the MVP, in order.
 | # | Milestone | Content | Status |
 |---|-----------|---------|--------|
 | 7 | Label CSV export | Select inventory items and download their names as a plain CSV with the column header `Label`, for label printing | Done |
-| 8 | Optional replenishment | Per item: auto-replenish or not. Auto-replenish items go on the shopping list when marked empty; other items ask for confirmation first, since they are not regular stock | Next |
-| 9 | Inventory check mode | Each item tracks when its stock last changed. A guided mode walks through the stalest items, asks to confirm the current stock and offers a quick way to update it | Planned |
+| 8 | Optional replenishment | Per item: auto-replenish or not. Auto-replenish items go on the shopping list when marked empty; other items only get an Add to list offer in the Undo bar, since they are not regular stock | Done |
+| 9 | Inventory check mode | Each item tracks when its stock last changed. A guided mode walks through the stalest items, asks to confirm the current stock and offers a quick way to update it | Next |
 
 ## After the MVP (unordered ideas)
 

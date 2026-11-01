@@ -4,7 +4,7 @@ defmodule KuraWeb.InventoryLive do
   import KuraWeb.InventoryComponents
 
   alias Kura.Inventory
-  alias Kura.Inventory.Item
+  alias Kura.Inventory.{Item, ShoppingList}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -160,6 +160,25 @@ defmodule KuraWeb.InventoryLive do
     with_item(socket, id, &mark_empty(socket, &1))
   end
 
+  def handle_event(
+        "add_to_list",
+        _params,
+        %{assigns: %{undo: %{offer_list?: true} = undo}} = socket
+      ) do
+    with_item(socket, undo.id, fn item ->
+      added =
+        case ShoppingList.put_on_list(item, actor(socket)) do
+          {:created, entry} -> entry
+          {:existing, _entry} -> nil
+        end
+
+      undo = %{undo | offer_list?: false, added_entry: added}
+      {:noreply, socket |> assign(undo: undo) |> load_items()}
+    end)
+  end
+
+  def handle_event("add_to_list", _params, socket), do: {:noreply, socket}
+
   def handle_event("undo", _params, %{assigns: %{undo: %{} = undo}} = socket) do
     with_item(socket, undo.id, fn item ->
       restore_stock(item, undo.previous, actor(socket))
@@ -231,7 +250,8 @@ defmodule KuraWeb.InventoryLive do
       id: item.id,
       name: item.name,
       previous: previous_stock(item),
-      added_entry: marked.__metadata__.added_entry
+      added_entry: marked.__metadata__.added_entry,
+      offer_list?: !marked.auto_replenish
     }
 
     {:noreply, socket |> assign(undo: undo) |> load_items()}
@@ -425,6 +445,11 @@ defmodule KuraWeb.InventoryLive do
               label="Usual amount to buy"
               min="1"
             />
+            <.input
+              field={@edit_form[:auto_replenish]}
+              type="checkbox"
+              label="Auto-replenish when empty"
+            />
             <div class="flex items-center gap-2 pt-2">
               <button type="submit" class="btn btn-primary rounded-full">Save</button>
               <button type="button" phx-click="cancel_edit" class="btn btn-ghost rounded-full">
@@ -471,13 +496,24 @@ defmodule KuraWeb.InventoryLive do
         role="status"
       >
         <span class="truncate">{@undo.name} marked empty</span>
-        <button
-          type="button"
-          phx-click="undo"
-          class="font-extrabold tracking-wider text-primary uppercase dark:text-neutral-content"
-        >
-          Undo
-        </button>
+        <div class="flex shrink-0 items-center gap-4">
+          <button
+            :if={@undo.offer_list?}
+            type="button"
+            id="add-to-list"
+            phx-click="add_to_list"
+            class="font-extrabold tracking-wider text-primary uppercase dark:text-neutral-content"
+          >
+            Add to list
+          </button>
+          <button
+            type="button"
+            phx-click="undo"
+            class="font-extrabold tracking-wider text-primary uppercase dark:text-neutral-content"
+          >
+            Undo
+          </button>
+        </div>
       </div>
     </Layouts.app>
     """

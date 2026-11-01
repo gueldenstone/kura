@@ -15,14 +15,26 @@ defmodule Kura.Inventory.ShoppingEntryTest do
 
   defp apples(actor, attrs \\ %{}) do
     Inventory.create_item!(
-      Map.merge(%{name: "Apples", tracking: :count, usual_amount: 6, stock_count: 1}, attrs),
+      Map.merge(
+        %{
+          name: "Apples",
+          tracking: :count,
+          usual_amount: 6,
+          stock_count: 1,
+          auto_replenish: true
+        },
+        attrs
+      ),
       actor: actor
     )
   end
 
   defp walnuts(actor, attrs \\ %{}) do
     Inventory.create_item!(
-      Map.merge(%{name: "Walnuts", tracking: :level, stock_level: :low}, attrs),
+      Map.merge(
+        %{name: "Walnuts", tracking: :level, stock_level: :low, auto_replenish: true},
+        attrs
+      ),
       actor: actor
     )
   end
@@ -225,6 +237,16 @@ defmodule Kura.Inventory.ShoppingEntryTest do
       assert entry.item_id == item.id
       assert entry.quantity == 6
       assert marked.__metadata__.added_entry.id == entry.id
+    end
+
+    test "leaves an item that does not auto-replenish off the list", %{actor: actor} do
+      item = apples(actor, %{auto_replenish: false})
+
+      marked = Inventory.mark_item_empty!(item, actor: actor)
+
+      assert marked.stock_count == 0
+      assert Inventory.list_open_entries!(actor: actor) == []
+      assert marked.__metadata__.added_entry == nil
     end
 
     test "does not add a second entry when the item is already on the list", %{actor: actor} do

@@ -110,6 +110,19 @@ defmodule Kura.Inventory.ItemTest do
     end
   end
 
+  describe "auto_replenish" do
+    test "is off for new items unless asked for", %{actor: actor} do
+      refute apples(actor).auto_replenish
+      assert walnuts(actor, %{auto_replenish: true}).auto_replenish
+    end
+
+    test "can be changed on an existing item", %{actor: actor} do
+      item = Inventory.update_item!(apples(actor), %{auto_replenish: true}, actor: actor)
+
+      assert item.auto_replenish
+    end
+  end
+
   describe "mark_item_empty/2" do
     test "sets a count item to 0", %{actor: actor} do
       item = Inventory.mark_item_empty!(apples(actor, %{stock_count: 4}), actor: actor)

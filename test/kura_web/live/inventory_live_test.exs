@@ -8,7 +8,9 @@ defmodule KuraWeb.InventoryLiveTest do
   setup :log_in_user
 
   defp item(user, attrs) do
-    Inventory.create_item!(Map.merge(%{tracking: :count}, attrs), actor: user)
+    Inventory.create_item!(Map.merge(%{tracking: :count, auto_replenish: true}, attrs),
+      actor: user
+    )
   end
 
   defp stored(user, item), do: Inventory.get_item!(item.id, actor: user)
@@ -74,6 +76,57 @@ defmodule KuraWeb.InventoryLiveTest do
 
       assert stored(user, apples).stock_count == 1
       refute has_element?(view, "#undo")
+    end
+
+    test "an item that does not auto-replenish is not listed until you say so", %{
+      conn: conn,
+      user: user
+    } do
+      mint = item(user, %{name: "Mint", stock_count: 1, auto_replenish: false})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{mint.id} button[aria-label='One less']") |> render_click()
+
+      assert has_element?(view, "#undo", "Mint marked empty")
+      refute has_element?(view, "#item-#{mint.id} [data-role=on-list]")
+      assert Inventory.list_open_entries!(actor: user) == []
+
+      view |> element("#add-to-list") |> render_click()
+
+      assert [entry] = Inventory.list_open_entries!(actor: user)
+      assert entry.item_id == mint.id
+      assert has_element?(view, "#item-#{mint.id} [data-role=on-list]")
+      refute has_element?(view, "#add-to-list")
+
+      view |> element("#undo button") |> render_click()
+
+      assert stored(user, mint).stock_count == 1
+      assert Inventory.list_open_entries!(actor: user) == []
+    end
+
+    test "ignoring the question leaves the item empty and off the list", %{
+      conn: conn,
+      user: user
+    } do
+      mint =
+        item(user, %{name: "Mint", tracking: :level, stock_level: :low, auto_replenish: false})
+
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{mint.id} button[phx-click=mark_empty]") |> render_click()
+
+      assert stored(user, mint).stock_level == :empty
+      assert Inventory.list_open_entries!(actor: user) == []
+    end
+
+    test "an item that auto-replenishes is listed without a question", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples", stock_count: 1})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[aria-label='One less']") |> render_click()
+
+      refute has_element?(view, "#add-to-list")
+      assert [_entry] = Inventory.list_open_entries!(actor: user)
     end
 
     test "empties a level item and can be undone", %{conn: conn, user: user} do
@@ -241,6 +294,7 @@ defmodule KuraWeb.InventoryLiveTest do
       assert to_string(walnuts.name) == "Walnuts"
       assert walnuts.tracking == :level
       assert walnuts.usual_amount == 2
+      refute walnuts.auto_replenish
       assert has_element?(view, "#item-#{walnuts.id}")
       refute has_element?(view, "#new-item-form")
     end
@@ -325,6 +379,19 @@ defmodule KuraWeb.InventoryLiveTest do
       assert updated.usual_amount == 4
       assert has_element?(view, "#item-#{apples.id}", "Green apples")
       refute has_element?(view, "#edit-item-form")
+    end
+
+    test "switches auto-replenish on and off", %{conn: conn, user: user} do
+      mint = item(user, %{name: "Mint", auto_replenish: false})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{mint.id} button[phx-click=edit]") |> render_click()
+      view |> form("#edit-item-form", item: %{auto_replenish: "true"}) |> render_submit()
+      assert stored(user, mint).auto_replenish
+
+      view |> element("#item-#{mint.id} button[phx-click=edit]") |> render_click()
+      view |> form("#edit-item-form", item: %{auto_replenish: "false"}) |> render_submit()
+      refute stored(user, mint).auto_replenish
     end
 
     test "tapping the name of an open card closes it again", %{conn: conn, user: user} do

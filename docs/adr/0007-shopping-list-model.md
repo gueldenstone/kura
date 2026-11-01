@@ -11,7 +11,7 @@ The shopping list must stay in step with the inventory: marking something empty 
 - An item has at most one **open** entry. This is enforced by a validation (`NotOnList`), not a database constraint. `ShoppingList.put_on_list/2` returns the existing entry instead of adding a second one.
 - **Check-off** restocks inside the same transaction: a count item gains the quantity, a level item goes to plenty. **Uncheck** reverses it (count minus quantity, never below 0; level back to `previous_level`).
 - **Hide checked** deletes the checked entries; they can no longer be unchecked. Entries checked off more than 24 hours ago are also deleted at the next check-off; that is what "a new shopping trip starts" means.
-- `mark_empty` on an item calls `put_on_list` and returns the entry it created in `__metadata__.added_entry`, so the inventory's undo can remove exactly that entry.
+- `mark_empty` on an item calls `put_on_list` only if the item has `auto_replenish` (default off; the migration switched it on for the items that existed). It returns the entry it created in `__metadata__.added_entry`, so the inventory's undo can remove exactly that entry. For other items the inventory offers "Add to list" in the undo bar and, if accepted, calls `put_on_list` itself.
 - Entries die with their item (`on_delete: :delete`).
 - **Live sync:** both resources publish every create, update and destroy to the topic `kitchen:changed` through `Ash.Notifier.PubSub` on `KuraWeb.Endpoint`. LiveViews subscribe and simply reload their data; `KuraWeb.LiveListCount` does the same for the open-entry badge in the tab bar.
 

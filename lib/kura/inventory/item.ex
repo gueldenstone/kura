@@ -20,14 +20,14 @@ defmodule Kura.Inventory.Item do
 
     create :create do
       primary? true
-      accept [:name, :tracking, :usual_amount, :stock_count, :stock_level]
+      accept [:name, :tracking, :usual_amount, :auto_replenish, :stock_count, :stock_level]
 
       change Kura.Inventory.Item.Changes.NormalizeStock
     end
 
     update :update do
       primary? true
-      accept [:name, :usual_amount]
+      accept [:name, :usual_amount, :auto_replenish]
     end
 
     update :change_count do
@@ -72,7 +72,7 @@ defmodule Kura.Inventory.Item do
     end
 
     update :mark_empty do
-      description "Sets the stock to empty (a count of 0, or the level `:empty`) and puts the item on the shopping list."
+      description "Sets the stock to empty (a count of 0, or the level `:empty`). Items that auto-replenish are also put on the shopping list."
       accept []
       require_atomic? false
 
@@ -149,6 +149,13 @@ defmodule Kura.Inventory.Item do
     attribute :stock_level, :atom do
       public? true
       constraints one_of: [:plenty, :low, :empty]
+    end
+
+    attribute :auto_replenish, :boolean do
+      description "Regular stock goes on the shopping list when it runs out; other items only when asked."
+      allow_nil? false
+      public? true
+      default false
     end
 
     attribute :usual_amount, :integer do
