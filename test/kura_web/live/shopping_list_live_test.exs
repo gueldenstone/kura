@@ -151,14 +151,46 @@ defmodule KuraWeb.ShoppingListLiveTest do
       view |> element("#add-item button") |> render_click()
 
       view
-      |> form("#new-item-form", item: %{tracking: "level", usual_amount: "2"})
-      |> render_submit()
+      |> element("#item-form button[phx-value-field=usual_amount][phx-value-delta='1']")
+      |> render_click()
+
+      view |> form("#item-form") |> render_submit()
+      render(view)
 
       [entry] = Inventory.list_open_entries!(actor: user)
       assert to_string(entry.item.name) == "Walnuts"
       assert entry.item.tracking == :level
       assert entry.quantity == 2
       assert has_element?(view, "#entry-#{entry.id}")
+    end
+
+    test "the new item opens as a sheet that Cancel closes without creating anything", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/")
+      view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()
+      view |> element("#add-item button") |> render_click()
+
+      assert has_element?(view, "h2", "New item")
+      view |> element("button[phx-click=close]", "Cancel") |> render_click()
+
+      refute has_element?(view, "#item-form")
+      assert Inventory.search_items!("", actor: user) == []
+    end
+
+    test "typing a name with a tag word creates the tagged item", %{conn: conn, user: user} do
+      ground = Inventory.create_tag!(%{name: "ground"}, actor: user)
+      {:ok, view, _html} = live(conn, ~p"/")
+      view |> form("#search-form", search: %{query: "Cumin ground"}) |> render_change()
+      view |> element("#add-item button") |> render_click()
+
+      view |> form("#item-form") |> render_submit()
+      render(view)
+
+      [entry] = Inventory.list_open_entries!(actor: user)
+      assert to_string(entry.item.name) == "Cumin"
+      assert entry.item.tag_key == Kura.Inventory.Item.tag_key([ground.id])
     end
 
     test "does not offer to create a name that already exists", %{conn: conn, user: user} do
@@ -191,6 +223,28 @@ defmodule KuraWeb.ShoppingListLiveTest do
       on_list(user, item(user, %{name: "Walnuts"}))
 
       assert has_element?(view, "nav [data-role=open-count]", "2")
+    end
+  end
+
+  describe "tags" do
+    test "entries and suggestions show the tags under the name", %{conn: conn, user: user} do
+      ground = Inventory.create_tag!(%{name: "ground"}, actor: user)
+
+      cumin =
+        Inventory.create_item!(
+          %{name: "Cumin", tracking: :count, tag_ids: [ground.id]},
+          actor: user
+        )
+
+      Inventory.add_entry!(%{item_id: cumin.id}, actor: user)
+      other = Inventory.create_item!(%{name: "Cumin", tracking: :count}, actor: user)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+      assert has_element?(view, "#open-entries [data-role=tags]", "ground")
+
+      view |> form("#search-form", search: %{query: "cumin"}) |> render_change()
+      refute has_element?(view, "#suggestion-#{cumin.id}")
+      assert has_element?(view, "#suggestion-#{other.id}")
     end
   end
 end

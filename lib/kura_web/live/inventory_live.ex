@@ -5,6 +5,7 @@ defmodule KuraWeb.InventoryLive do
 
   alias Kura.Inventory
   alias Kura.Inventory.{Item, ShoppingList}
+  alias KuraWeb.ItemFormComponent
 
   @undo_timeout 10_000
 
@@ -13,9 +14,10 @@ defmodule KuraWeb.InventoryLive do
     socket =
       socket
       |> assign(:page_title, "Inventory")
-      |> assign(query: "", new_form: nil, editing: nil, edit_form: nil, undo: nil)
+      |> assign(query: "", adding: nil, editing: nil, edit_item: nil, undo: nil)
       |> assign(selecting?: false, selected: MapSet.new())
       |> assign(checking: nil, check_item: nil)
+      |> assign(tags: [])
       |> start_check_on_check_route()
       |> assign_search_form()
       |> load_items()
@@ -26,11 +28,11 @@ defmodule KuraWeb.InventoryLive do
   @impl true
   def handle_event("search", %{"search" => %{"query" => query}}, socket) do
     {:noreply,
-     socket |> assign(query: query, new_form: nil) |> assign_search_form() |> load_items()}
+     socket |> assign(query: query, adding: nil) |> assign_search_form() |> load_items()}
   end
 
   def handle_event("quick_add", %{"search" => %{"query" => query}}, socket) do
-    socket = socket |> assign(query: query, new_form: nil) |> assign_search_form() |> load_items()
+    socket = socket |> assign(query: query, adding: nil) |> assign_search_form() |> load_items()
 
     if show_add_prompt?(query, socket.assigns.items) do
       {:noreply, open_add_form(socket)}
@@ -80,9 +82,9 @@ defmodule KuraWeb.InventoryLive do
      assign(socket,
        selecting?: true,
        selected: MapSet.new(),
-       new_form: nil,
+       adding: nil,
        editing: nil,
-       edit_form: nil,
+       edit_item: nil,
        undo: nil
      )}
   end
@@ -113,62 +115,21 @@ defmodule KuraWeb.InventoryLive do
 
   def handle_event("open_add", _params, socket), do: {:noreply, open_add_form(socket)}
 
-  def handle_event("validate_new", %{"item" => params}, socket) do
-    form = AshPhoenix.Form.validate(socket.assigns.new_form.source, params)
-    {:noreply, assign(socket, new_form: to_form(form))}
-  end
-
-  def handle_event("create", %{"item" => params}, socket) do
-    case AshPhoenix.Form.submit(socket.assigns.new_form.source, params: params) do
-      {:ok, _item} ->
-        {:noreply,
-         socket |> assign(new_form: nil, query: "") |> assign_search_form() |> load_items()}
-
-      {:error, form} ->
-        {:noreply, assign(socket, new_form: to_form(form))}
-    end
-  end
-
-  def handle_event("cancel_add", _params, socket) do
-    {:noreply, assign(socket, new_form: nil)}
-  end
-
   def handle_event("edit", %{"id" => id}, %{assigns: %{editing: id}} = socket) do
-    {:noreply, assign(socket, editing: nil, edit_form: nil)}
+    {:noreply, assign(socket, editing: nil, edit_item: nil)}
   end
 
   def handle_event("edit", %{"id" => id}, socket) do
     with_item(socket, id, fn item ->
-      form = AshPhoenix.Form.for_update(item, :update, as: "item", actor: actor(socket))
-      {:noreply, assign(socket, editing: item.id, edit_form: to_form(form))}
+      {:noreply, assign(socket, editing: item.id, edit_item: item, adding: nil)}
     end)
   end
 
-  def handle_event("validate_edit", %{"item" => params}, socket) do
-    form = AshPhoenix.Form.validate(socket.assigns.edit_form.source, params)
-    {:noreply, assign(socket, edit_form: to_form(form))}
+  def handle_event("edit_checked", _params, %{assigns: %{check_item: %Item{} = item}} = socket) do
+    {:noreply, assign(socket, editing: item.id, edit_item: item)}
   end
 
-  def handle_event("update", %{"item" => params}, socket) do
-    case AshPhoenix.Form.submit(socket.assigns.edit_form.source, params: params) do
-      {:ok, _item} ->
-        {:noreply, socket |> assign(editing: nil, edit_form: nil) |> load_items()}
-
-      {:error, form} ->
-        {:noreply, assign(socket, edit_form: to_form(form))}
-    end
-  end
-
-  def handle_event("cancel_edit", _params, socket) do
-    {:noreply, assign(socket, editing: nil, edit_form: nil)}
-  end
-
-  def handle_event("delete", _params, %{assigns: %{editing: id}} = socket) when is_binary(id) do
-    with_item(socket, id, fn item ->
-      :ok = Inventory.delete_item(item, actor: actor(socket))
-      {:noreply, socket |> assign(editing: nil, edit_form: nil, undo: nil) |> load_items()}
-    end)
-  end
+  def handle_event("edit_checked", _params, socket), do: {:noreply, socket}
 
   def handle_event("change_count", %{"id" => id, "delta" => delta}, socket) do
     with_item(socket, id, fn item ->
@@ -238,23 +199,35 @@ defmodule KuraWeb.InventoryLive do
     {:noreply, assign(socket, undo: nil)}
   end
 
+  def handle_info({:item_form, :saved, _item}, %{assigns: %{adding: %{}}} = socket) do
+    {:noreply,
+     socket
+     |> assign(adding: nil, query: "")
+     |> assign_search_form()
+     |> load_items()}
+  end
+
+  def handle_info({:item_form, :saved, _item}, socket) do
+    {:noreply, socket |> assign(editing: nil, edit_item: nil) |> load_items()}
+  end
+
+  def handle_info({:item_form, :deleted, _item}, socket) do
+    {:noreply, socket |> assign(editing: nil, edit_item: nil, undo: nil) |> load_items()}
+  end
+
+  def handle_info({:item_form, :closed}, socket) do
+    {:noreply, assign(socket, adding: nil, editing: nil, edit_item: nil)}
+  end
+
   def handle_info(_message, socket), do: {:noreply, socket}
 
   defp open_add_form(socket) do
-    form =
-      AshPhoenix.Form.for_create(Item, :create,
-        as: "item",
-        actor: actor(socket),
-        params: %{
-          "name" => String.trim(socket.assigns.query),
-          "tracking" => "level",
-          "stock_level" => "plenty",
-          "stock_count" => "1"
-        }
-      )
-
-    assign(socket, new_form: to_form(form))
+    prefill = ItemFormComponent.prefill(socket.assigns.query, socket.assigns.tags)
+    assign(socket, adding: prefill, editing: nil, edit_item: nil)
   end
+
+  defp load_tags(socket),
+    do: assign(socket, :tags, Inventory.list_tags!(actor: actor(socket)))
 
   defp actor(socket), do: socket.assigns.current_user
 
@@ -269,7 +242,7 @@ defmodule KuraWeb.InventoryLive do
         load: [:empty?, :on_list?]
       )
 
-    socket |> assign(:items, items) |> refresh_check()
+    socket |> assign(:items, items) |> load_tags() |> refresh_check()
   end
 
   # The check lives on its own route, `/inventory/check`, which is the middle tab.
@@ -286,7 +259,7 @@ defmodule KuraWeb.InventoryLive do
   defp refresh_check(%{assigns: %{checking: %{ids: ids, index: index} = checking}} = socket) do
     with id when is_binary(id) <- Enum.at(ids, index),
          {:ok, item} <-
-           Inventory.get_item(id, actor: actor(socket), load: [:empty?, :on_list?]) do
+           Inventory.get_item(id, actor: actor(socket), load: [:empty?, :on_list?, :tags]) do
       assign(socket, check_item: item)
     else
       nil ->
@@ -328,7 +301,7 @@ defmodule KuraWeb.InventoryLive do
 
   # An item can vanish while this page is open, for example when the other person deletes it.
   defp with_item(socket, id, fun) do
-    case Inventory.get_item(id, actor: actor(socket)) do
+    case Inventory.get_item(id, actor: actor(socket), load: [:tags]) do
       {:ok, item} ->
         fun.(item)
 
@@ -336,7 +309,7 @@ defmodule KuraWeb.InventoryLive do
         {:noreply,
          socket
          |> put_flash(:error, "That item no longer exists")
-         |> assign(editing: nil, edit_form: nil, undo: nil)
+         |> assign(editing: nil, edit_item: nil, undo: nil)
          |> load_items()}
     end
   end
@@ -346,7 +319,7 @@ defmodule KuraWeb.InventoryLive do
 
     undo = %{
       id: item.id,
-      name: item.name,
+      name: Item.label(item),
       previous: previous_stock(item),
       added_entry: marked.__metadata__.added_entry,
       offer_list?: !marked.auto_replenish
@@ -399,7 +372,7 @@ defmodule KuraWeb.InventoryLive do
 
   defp show_add_prompt?(query, items) do
     name = query |> String.trim() |> String.downcase()
-    name != "" and not Enum.any?(items, &(String.downcase(to_string(&1.name)) == name))
+    name != "" and not Enum.any?(items, &(String.downcase(Item.label(&1)) == name))
   end
 
   @impl true
@@ -445,6 +418,13 @@ defmodule KuraWeb.InventoryLive do
             <h2 class="font-display text-3xl leading-tight font-bold break-words">
               {@check_item.name}
             </h2>
+            <p
+              :if={@check_item.tags != []}
+              data-role="tags"
+              class="mt-0.5 text-base font-semibold text-base-content/60"
+            >
+              {Item.tag_line(@check_item)}
+            </p>
             <p data-role="checked-ago" class="mt-1 text-sm text-base-content/55">
               Stock last changed {checked_ago(@check_item.stock_checked_at)}
             </p>
@@ -469,6 +449,14 @@ defmodule KuraWeb.InventoryLive do
                 class="grid size-11 place-items-center rounded-full bg-base-300/60 transition hover:bg-base-300 active:scale-90 disabled:opacity-30"
               >
                 <.icon name="hero-chevron-left" class="size-5" />
+              </button>
+              <button
+                type="button"
+                id="edit-checked"
+                phx-click="edit_checked"
+                class="h-11 rounded-full px-4 text-[13px] font-bold transition hover:bg-base-300/60 active:scale-95"
+              >
+                Edit
               </button>
               <button
                 type="button"
@@ -573,7 +561,7 @@ defmodule KuraWeb.InventoryLive do
           </div>
         </.form>
 
-        <div :if={show_add_prompt?(@query, @items) and is_nil(@new_form)} id="add-item" class="mb-3">
+        <div :if={show_add_prompt?(@query, @items) and is_nil(@adding)} id="add-item" class="mb-3">
           <button
             type="button"
             phx-click="open_add"
@@ -583,7 +571,15 @@ defmodule KuraWeb.InventoryLive do
           </button>
         </div>
 
-        <.new_item_form :if={@new_form} form={@new_form} />
+        <.live_component
+          :if={@adding}
+          module={ItemFormComponent}
+          id="item-form-new"
+          item={nil}
+          prefill={@adding}
+          variant={:inline}
+          current_user={@current_user}
+        />
 
         <p
           :if={@items == [] and String.trim(@query) == ""}
@@ -622,7 +618,7 @@ defmodule KuraWeb.InventoryLive do
                     class="size-4"
                   />
                 </span>
-                <span class="truncate text-[17px] font-bold">{item.name}</span>
+                <.item_title item={item} />
               </button>
             </div>
 
@@ -634,12 +630,7 @@ defmodule KuraWeb.InventoryLive do
                 aria-label={"Edit #{item.name}"}
                 class="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1.5 text-left transition active:opacity-70"
               >
-                <span class={[
-                  "truncate text-[17px] font-bold",
-                  item.empty? && "text-base-content/60"
-                ]}>
-                  {item.name}
-                </span>
+                <.item_title item={item} class={item.empty? && "text-base-content/60"} />
                 <span
                   :if={item.on_list?}
                   data-role="on-list"
@@ -652,41 +643,14 @@ defmodule KuraWeb.InventoryLive do
               <.stock_control item={item} />
             </div>
 
-            <.form
+            <.live_component
               :if={!@selecting? and @editing == item.id}
-              for={@edit_form}
-              id="edit-item-form"
-              phx-change="validate_edit"
-              phx-submit="update"
-              class="mt-3 space-y-1 rounded-2xl bg-base-200 p-4"
-            >
-              <.input field={@edit_form[:name]} type="text" label="Name" />
-              <.input
-                field={@edit_form[:usual_amount]}
-                type="number"
-                label="Usual amount to buy"
-                min="1"
-              />
-              <.input
-                field={@edit_form[:auto_replenish]}
-                type="checkbox"
-                label="Auto-replenish when empty"
-              />
-              <div class="flex items-center gap-2 pt-2">
-                <button type="submit" class="btn btn-primary rounded-full">Save</button>
-                <button type="button" phx-click="cancel_edit" class="btn btn-ghost rounded-full">
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  phx-click="delete"
-                  data-confirm={"Delete #{item.name}?"}
-                  class="btn btn-ghost ml-auto rounded-full text-error"
-                >
-                  Delete
-                </button>
-              </div>
-            </.form>
+              module={ItemFormComponent}
+              id={"item-form-#{item.id}"}
+              item={@edit_item}
+              variant={:inline}
+              current_user={@current_user}
+            />
           </li>
         </ul>
       </div>
@@ -713,6 +677,15 @@ defmodule KuraWeb.InventoryLive do
           Export labels
         </button>
       </.form>
+
+      <.live_component
+        :if={@checking && @editing}
+        module={ItemFormComponent}
+        id={"item-form-#{@editing}"}
+        item={@edit_item}
+        variant={:sheet}
+        current_user={@current_user}
+      />
 
       <div
         :if={@undo}

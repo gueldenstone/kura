@@ -5,13 +5,14 @@ defmodule KuraWeb.ShoppingListLive do
 
   alias Kura.Inventory
   alias Kura.Inventory.{Item, ShoppingList}
+  alias KuraWeb.ItemFormComponent
 
   @impl true
   def mount(_params, _session, socket) do
     socket =
       socket
       |> assign(:page_title, "Shopping list")
-      |> assign(query: "", new_form: nil)
+      |> assign(query: "", adding: nil, tags: [])
       |> assign_search_form()
       |> load()
 
@@ -20,11 +21,11 @@ defmodule KuraWeb.ShoppingListLive do
 
   @impl true
   def handle_event("search", %{"search" => %{"query" => query}}, socket) do
-    {:noreply, socket |> assign(query: query, new_form: nil) |> assign_search_form() |> load()}
+    {:noreply, socket |> assign(query: query, adding: nil) |> assign_search_form() |> load()}
   end
 
   def handle_event("quick_add", %{"search" => %{"query" => query}}, socket) do
-    socket = socket |> assign(query: query, new_form: nil) |> assign_search_form() |> load()
+    socket = socket |> assign(query: query, adding: nil) |> assign_search_form() |> load()
 
     if socket.assigns.show_add_prompt? do
       handle_event("open_add", %{}, socket)
@@ -45,35 +46,8 @@ defmodule KuraWeb.ShoppingListLive do
   end
 
   def handle_event("open_add", _params, socket) do
-    form =
-      AshPhoenix.Form.for_create(Item, :create,
-        as: "item",
-        actor: actor(socket),
-        params: %{"name" => String.trim(socket.assigns.query), "tracking" => "count"}
-      )
-
-    {:noreply, assign(socket, new_form: to_form(form))}
-  end
-
-  def handle_event("validate_new", %{"item" => params}, socket) do
-    form = AshPhoenix.Form.validate(socket.assigns.new_form.source, params)
-    {:noreply, assign(socket, new_form: to_form(form))}
-  end
-
-  def handle_event("create", %{"item" => params}, socket) do
-    case AshPhoenix.Form.submit(socket.assigns.new_form.source, params: params) do
-      {:ok, item} ->
-        ShoppingList.put_on_list(item, actor(socket))
-
-        {:noreply, socket |> assign(new_form: nil, query: "") |> assign_search_form() |> load()}
-
-      {:error, form} ->
-        {:noreply, assign(socket, new_form: to_form(form))}
-    end
-  end
-
-  def handle_event("cancel_add", _params, socket) do
-    {:noreply, assign(socket, new_form: nil)}
+    prefill = ItemFormComponent.prefill(socket.assigns.query, socket.assigns.tags)
+    {:noreply, assign(socket, adding: prefill)}
   end
 
   def handle_event("check", %{"id" => id}, socket) do
@@ -104,6 +78,13 @@ defmodule KuraWeb.ShoppingListLive do
     {:noreply, load(socket)}
   end
 
+  def handle_info({:item_form, :saved, item}, socket) do
+    ShoppingList.put_on_list(item, actor(socket))
+    {:noreply, socket |> assign(adding: nil, query: "") |> assign_search_form() |> load()}
+  end
+
+  def handle_info({:item_form, :closed}, socket), do: {:noreply, assign(socket, adding: nil)}
+
   def handle_info(_message, socket), do: {:noreply, socket}
 
   defp actor(socket), do: socket.assigns.current_user
@@ -122,6 +103,7 @@ defmodule KuraWeb.ShoppingListLive do
         else: Inventory.search_items!(String.trim(query), actor: actor, load: [:on_list?])
 
     assign(socket,
+      tags: Inventory.list_tags!(actor: actor),
       open: Inventory.list_open_entries!(actor: actor),
       checked: Inventory.list_checked_entries!(actor: actor),
       suggestions: Enum.reject(matches, & &1.on_list?),
@@ -141,7 +123,7 @@ defmodule KuraWeb.ShoppingListLive do
 
   defp show_add_prompt?(query, matches) do
     name = query |> String.trim() |> String.downcase()
-    name != "" and not Enum.any?(matches, &(String.downcase(to_string(&1.name)) == name))
+    name != "" and not Enum.any?(matches, &(String.downcase(Item.label(&1)) == name))
   end
 
   defp to_buy(0), do: "Nothing to buy"
@@ -183,7 +165,7 @@ defmodule KuraWeb.ShoppingListLive do
       </.form>
 
       <div
-        :if={@suggestions != [] or (@show_add_prompt? and is_nil(@new_form))}
+        :if={@suggestions != [] or (@show_add_prompt? and is_nil(@adding))}
         id="suggestions"
         class="mb-3 rounded-box bg-base-100 p-1.5 shadow-card"
       >
@@ -193,7 +175,7 @@ defmodule KuraWeb.ShoppingListLive do
           class="flex items-center gap-3 border-b border-base-300 p-2.5 last:border-b-0"
         >
           <div class="min-w-0 flex-1">
-            <div class="truncate font-bold">{item.name}</div>
+            <.item_title item={item} class="text-base" />
             <div class="text-sm text-base-content/60">usual amount {item.usual_amount}</div>
           </div>
           <button
@@ -207,7 +189,7 @@ defmodule KuraWeb.ShoppingListLive do
           </button>
         </div>
 
-        <div :if={@show_add_prompt? and is_nil(@new_form)} id="add-item" class="p-1">
+        <div :if={@show_add_prompt? and is_nil(@adding)} id="add-item" class="p-1">
           <button
             type="button"
             phx-click="open_add"
@@ -218,7 +200,15 @@ defmodule KuraWeb.ShoppingListLive do
         </div>
       </div>
 
-      <.new_item_form :if={@new_form} form={@new_form} />
+      <.live_component
+        :if={@adding}
+        module={ItemFormComponent}
+        id="item-form-new"
+        item={nil}
+        prefill={@adding}
+        variant={:sheet}
+        current_user={@current_user}
+      />
 
       <p
         :if={@open == [] and @checked == [] and String.trim(@query) == ""}
@@ -242,7 +232,7 @@ defmodule KuraWeb.ShoppingListLive do
             aria-label={"Check off #{entry.item.name}"}
             class="size-11 shrink-0 rounded-full border-[2.5px] border-primary/55 transition hover:bg-primary/10 active:scale-90"
           />
-          <span class="min-w-0 flex-1 truncate text-[17px] font-bold">{entry.item.name}</span>
+          <.item_title item={entry.item} />
           <div class="flex shrink-0 items-center gap-1">
             <button
               type="button"
@@ -310,9 +300,10 @@ defmodule KuraWeb.ShoppingListLive do
             >
               <.icon name="hero-check" class="size-6" />
             </button>
-            <span class="min-w-0 flex-1 truncate text-[17px] font-bold text-base-content/55 line-through decoration-[1.5px]">
-              {entry.item.name}
-            </span>
+            <.item_title
+              item={entry.item}
+              class="text-base-content/55 line-through decoration-[1.5px]"
+            />
             <span class="font-bold text-base-content/55 tabular-nums">× {entry.quantity}</span>
           </li>
         </ul>

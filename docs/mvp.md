@@ -13,6 +13,7 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 - Each item has a name and a tracking type (items have no icon):
   - **count**: a number; 0 is empty.
   - **level**: plenty / low / empty.
+- **One item form everywhere** (`KuraWeb.ItemFormComponent`): name, tags, stock (new items only: Level or Count with the starting stock), usual amount to buy as a stepper, an Auto-replenish switch, and Delete (existing items only). In the inventory it opens inline, in the row for an existing item and as a card above the list for a new one; from the shopping list's add prompt and from the **Edit** button on a check card it opens as a sheet over the page (Save and Cancel stay at the bottom, Escape closes). Added from the shopping list, the new item also goes on the list.
 
 ### Tags
 - Tags are a shared list (for example ground, whole, Usbekistan) that both users extend. An item can have any number of tags. Name plus the set of tags must be unique: "Cumin" tagged ground and "Cumin" tagged whole are two items.

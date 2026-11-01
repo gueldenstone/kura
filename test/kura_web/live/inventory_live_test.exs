@@ -15,6 +15,28 @@ defmodule KuraWeb.InventoryLiveTest do
 
   defp stored(user, item), do: Inventory.get_item!(item.id, actor: user)
 
+  # The form tells its page that it saved through a message; wait until the page has handled it.
+  defp submit_item_form(view, values \\ []) do
+    view |> form("#item-form", values) |> render_submit()
+    render(view)
+  end
+
+  # The item form's buttons: `choose` picks a value, `step` adds to or takes from a number.
+  defp choose(view, field, value) do
+    view
+    |> element("#item-form button[phx-value-field=#{field}][phx-value-choice=#{value}]")
+    # A browser always sends the button's own `value` too, which would hide a `phx-value-value`.
+    |> render_click(%{"value" => ""})
+  end
+
+  defp step(view, field, delta, times \\ 1) do
+    for _ <- 1..times do
+      view
+      |> element("#item-form button[phx-value-field=#{field}][phx-value-delta='#{delta}']")
+      |> render_click()
+    end
+  end
+
   test "shows a hint when there are no items yet", %{conn: conn} do
     {:ok, _view, html} = live(conn, ~p"/inventory")
 
@@ -306,9 +328,8 @@ defmodule KuraWeb.InventoryLiveTest do
       view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()
       view |> element("#add-item button") |> render_click()
 
-      view
-      |> form("#new-item-form", item: %{tracking: "level", usual_amount: "2"})
-      |> render_submit()
+      step(view, "usual_amount", 1)
+      view |> form("#item-form") |> render_submit()
 
       [walnuts] = Inventory.search_items!("", actor: user)
       assert to_string(walnuts.name) == "Walnuts"
@@ -316,7 +337,7 @@ defmodule KuraWeb.InventoryLiveTest do
       assert walnuts.usual_amount == 2
       refute walnuts.auto_replenish
       assert has_element?(view, "#item-#{walnuts.id}")
-      refute has_element?(view, "#new-item-form")
+      refute has_element?(view, "#item-form")
     end
 
     test "defaults to level tracking and sets the stock right away", %{conn: conn, user: user} do
@@ -324,7 +345,8 @@ defmodule KuraWeb.InventoryLiveTest do
       view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()
       view |> element("#add-item button") |> render_click()
 
-      view |> form("#new-item-form", item: %{stock_level: "low"}) |> render_submit()
+      choose(view, "stock_level", "low")
+      view |> form("#item-form") |> render_submit()
 
       [walnuts] = Inventory.search_items!("", actor: user)
       assert walnuts.tracking == :level
@@ -336,8 +358,9 @@ defmodule KuraWeb.InventoryLiveTest do
       view |> form("#search-form", search: %{query: "Apples"}) |> render_change()
       view |> element("#add-item button") |> render_click()
 
-      view |> form("#new-item-form", item: %{tracking: "count"}) |> render_change()
-      view |> form("#new-item-form", item: %{stock_count: "6"}) |> render_submit()
+      choose(view, "tracking", "count")
+      step(view, "stock_count", 1, 5)
+      view |> form("#item-form") |> render_submit()
 
       [apples] = Inventory.search_items!("", actor: user)
       assert apples.tracking == :count
@@ -352,11 +375,12 @@ defmodule KuraWeb.InventoryLiveTest do
 
       view |> form("#search-form", search: %{query: "Walnuts"}) |> render_submit()
 
-      assert has_element?(view, "#new-item-form")
+      assert has_element?(view, "#item-form")
       assert Inventory.search_items!("", actor: user) == []
 
-      view |> form("#new-item-form", item: %{tracking: "count"}) |> render_change()
-      view |> form("#new-item-form", item: %{stock_count: "3"}) |> render_submit()
+      choose(view, "tracking", "count")
+      step(view, "stock_count", 1, 2)
+      view |> form("#item-form") |> render_submit()
 
       [walnuts] = Inventory.search_items!("", actor: user)
       assert to_string(walnuts.name) == "Walnuts"
@@ -369,7 +393,7 @@ defmodule KuraWeb.InventoryLiveTest do
 
       view |> form("#search-form", search: %{query: "walnuts"}) |> render_submit()
 
-      refute has_element?(view, "#new-item-form")
+      refute has_element?(view, "#item-form")
       assert [_one] = Inventory.search_items!("", actor: user)
     end
 
@@ -390,15 +414,14 @@ defmodule KuraWeb.InventoryLiveTest do
 
       view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
 
-      view
-      |> form("#edit-item-form", item: %{name: "Green apples", usual_amount: "4"})
-      |> render_submit()
+      step(view, "usual_amount", -1, 2)
+      view |> form("#item-form", item: %{name: "Green apples"}) |> render_submit()
 
       updated = stored(user, apples)
       assert to_string(updated.name) == "Green apples"
       assert updated.usual_amount == 4
       assert has_element?(view, "#item-#{apples.id}", "Green apples")
-      refute has_element?(view, "#edit-item-form")
+      refute has_element?(view, "#item-form")
     end
 
     test "switches auto-replenish on and off", %{conn: conn, user: user} do
@@ -406,12 +429,41 @@ defmodule KuraWeb.InventoryLiveTest do
       {:ok, view, _html} = live(conn, ~p"/inventory")
 
       view |> element("#item-#{mint.id} button[phx-click=edit]") |> render_click()
-      view |> form("#edit-item-form", item: %{auto_replenish: "true"}) |> render_submit()
+      submit_item_form(view, item: %{auto_replenish: "true"})
       assert stored(user, mint).auto_replenish
 
       view |> element("#item-#{mint.id} button[phx-click=edit]") |> render_click()
-      view |> form("#edit-item-form", item: %{auto_replenish: "false"}) |> render_submit()
+      submit_item_form(view, item: %{auto_replenish: false})
       refute stored(user, mint).auto_replenish
+    end
+
+    test "the form asks for stock only when adding, not when editing", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples"})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
+      refute has_element?(view, "#item-form button[phx-value-field=tracking]")
+      assert has_element?(view, "#item-form [data-role=usual_amount]", "1")
+      assert has_element?(view, "button[phx-click=delete]", "Delete")
+
+      view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()
+      view |> element("#add-item button") |> render_click()
+
+      assert has_element?(view, "#item-form button[phx-value-field=tracking]")
+      refute has_element?(view, "button[phx-click=delete]")
+      refute has_element?(view, "#item-#{apples.id} #item-form")
+    end
+
+    test "Cancel closes the form without saving", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples"})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
+      view |> form("#item-form", item: %{name: "Pears"}) |> render_change()
+      view |> element("button[phx-click=close]", "Cancel") |> render_click()
+
+      refute has_element?(view, "#item-form")
+      assert to_string(stored(user, apples).name) == "Apples"
     end
 
     test "tapping the name of an open card closes it again", %{conn: conn, user: user} do
@@ -420,10 +472,10 @@ defmodule KuraWeb.InventoryLiveTest do
       edit = "#item-#{apples.id} button[phx-click=edit]"
 
       view |> element(edit) |> render_click()
-      assert has_element?(view, "#edit-item-form")
+      assert has_element?(view, "#item-form")
 
       view |> element(edit) |> render_click()
-      refute has_element?(view, "#edit-item-form")
+      refute has_element?(view, "#item-form")
     end
 
     test "shows validation errors", %{conn: conn, user: user} do
@@ -431,10 +483,10 @@ defmodule KuraWeb.InventoryLiveTest do
       {:ok, view, _html} = live(conn, ~p"/inventory")
 
       view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
-      html = view |> form("#edit-item-form", item: %{usual_amount: "0"}) |> render_submit()
+      html = view |> form("#item-form", item: %{name: ""}) |> render_submit()
 
-      assert html =~ "must be greater than or equal to 1"
-      assert stored(user, apples).usual_amount == 1
+      assert html =~ "is required"
+      assert to_string(stored(user, apples).name) == "Apples"
     end
 
     test "deletes an item", %{conn: conn, user: user} do
@@ -442,7 +494,7 @@ defmodule KuraWeb.InventoryLiveTest do
       {:ok, view, _html} = live(conn, ~p"/inventory")
 
       view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
-      view |> element("#edit-item-form button[phx-click=delete]") |> render_click()
+      view |> element("button[phx-click=delete]") |> render_click()
 
       refute has_element?(view, "#item-#{apples.id}")
       assert Inventory.search_items!("", actor: user) == []
@@ -656,6 +708,173 @@ defmodule KuraWeb.InventoryLiveTest do
       assert stored(user, ctx.mint).stock_count == 0
       assert has_element?(view, "#undo", "Mint marked empty")
       assert [_entry] = Inventory.list_open_entries!(actor: user)
+    end
+  end
+
+  describe "tags" do
+    defp tag(user, name), do: Inventory.create_tag!(%{name: name}, actor: user)
+
+    defp tagged(user, name, tags) do
+      Inventory.create_item!(
+        %{name: name, tracking: :level, tag_ids: Enum.map(tags, & &1.id)},
+        actor: user
+      )
+    end
+
+    test "rows show the tags under the name", %{conn: conn, user: user} do
+      ground = tag(user, "ground")
+      bio = tag(user, "Bio")
+      cumin = tagged(user, "Cumin", [ground, bio])
+      salt = tagged(user, "Salt", [])
+
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      assert has_element?(view, "#item-#{cumin.id} [data-role=tags]", "Bio · ground")
+      refute has_element?(view, "#item-#{salt.id} [data-role=tags]")
+    end
+
+    test "search finds items by their tags", %{conn: conn, user: user} do
+      ground = tag(user, "ground")
+      cumin = tagged(user, "Cumin", [ground])
+      salt = tagged(user, "Salt", [])
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> form("#search-form", search: %{query: "ground"}) |> render_change()
+
+      assert has_element?(view, "#item-#{cumin.id}")
+      refute has_element?(view, "#item-#{salt.id}")
+    end
+
+    test "tags are picked, created and removed in the edit form", %{conn: conn, user: user} do
+      tag(user, "ground")
+      cumin = tagged(user, "Cumin", [])
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{cumin.id} button[phx-click=edit]") |> render_click()
+      assert has_element?(view, "#tag-picker [data-role=available-tag]", "ground")
+
+      view |> element("#tag-picker [data-role=available-tag]", "ground") |> render_click()
+      assert has_element?(view, "#tag-picker [data-role=chosen-tag]", "ground")
+
+      view |> form("#item-form", tag_query: "Bio") |> render_change()
+      view |> element("#tag-picker [data-role=create-tag]") |> render_click()
+      assert has_element?(view, "#tag-picker [data-role=chosen-tag]", "Bio")
+
+      submit_item_form(view)
+
+      assert ["Bio", "ground"] ==
+               cumin.id
+               |> Inventory.get_item!(actor: user, load: [:tags])
+               |> Kura.Inventory.Item.tag_line()
+               |> String.split(" · ")
+
+      view |> element("#item-#{cumin.id} button[phx-click=edit]") |> render_click()
+      view |> element("#tag-picker [data-role=chosen-tag]", "Bio") |> render_click()
+      view |> element("#tag-picker [data-role=chosen-tag]", "ground") |> render_click()
+      submit_item_form(view)
+
+      assert Inventory.get_item!(cumin.id, actor: user).tag_key == ""
+    end
+
+    test "typing a name with a tag word offers the item with that tag", %{conn: conn, user: user} do
+      ground = tag(user, "ground")
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> form("#search-form", search: %{query: "Cumin ground"}) |> render_change()
+      view |> element("#add-item button") |> render_click()
+
+      assert has_element?(view, ~s(#item-form input[name="item[name]"][value=Cumin]))
+      assert has_element?(view, "#tag-picker [data-role=chosen-tag]", "ground")
+
+      submit_item_form(view)
+
+      assert [cumin] = Inventory.search_items!("", actor: user)
+      assert to_string(cumin.name) == "Cumin"
+      assert cumin.tag_key == Kura.Inventory.Item.tag_key([ground.id])
+    end
+
+    test "Enter in the tag box takes the only match, or creates the tag", %{
+      conn: conn,
+      user: user
+    } do
+      tag(user, "ground")
+      cumin = tagged(user, "Cumin", [])
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+      view |> element("#item-#{cumin.id} button[phx-click=edit]") |> render_click()
+
+      view |> form("#item-form", tag_query: "gro") |> render_change()
+      view |> element("#tag-query") |> render_hook("tag_enter", %{})
+      assert has_element?(view, "#tag-picker [data-role=chosen-tag]", "ground")
+
+      view |> form("#item-form", tag_query: "whole") |> render_change()
+      view |> element("#tag-query") |> render_hook("tag_enter", %{})
+      assert has_element?(view, "#tag-picker [data-role=chosen-tag]", "whole")
+      assert length(Inventory.list_tags!(actor: user)) == 2
+    end
+
+    test "two items cannot have the same name and tags", %{conn: conn, user: user} do
+      ground = tag(user, "ground")
+      tagged(user, "Cumin", [ground])
+      other = tagged(user, "Cumin", [])
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{other.id} button[phx-click=edit]") |> render_click()
+      view |> element("#tag-picker [data-role=available-tag]", "ground") |> render_click()
+      html = submit_item_form(view)
+
+      assert html =~ "is already in the inventory with these tags"
+    end
+
+    test "the check card shows the tags", %{conn: conn, user: user} do
+      ground = tag(user, "ground")
+      cumin = tagged(user, "Cumin", [ground])
+
+      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+
+      assert has_element?(view, "#check-card-#{cumin.id} [data-role=tags]", "ground")
+    end
+  end
+
+  describe "the item form while checking the stock" do
+    test "opens as a sheet from the card, saves and closes", %{conn: conn, user: user} do
+      mint = item(user, %{name: "Mint", stock_count: 2})
+      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+
+      view |> element("#edit-checked") |> render_click()
+      assert has_element?(view, "#item-form")
+      assert has_element?(view, "h2", "Edit Mint")
+
+      view |> form("#item-form", item: %{name: "Peppermint"}) |> render_submit()
+      render(view)
+
+      refute has_element?(view, "#item-form")
+      assert to_string(stored(user, mint).name) == "Peppermint"
+      assert has_element?(view, "#check-card-#{mint.id}", "Peppermint")
+    end
+
+    test "can delete the item from the sheet", %{conn: conn, user: user} do
+      mint = item(user, %{name: "Mint"})
+      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+
+      view |> element("#edit-checked") |> render_click()
+      view |> element("button[phx-click=delete]") |> render_click()
+      render(view)
+
+      assert {:error, _} = Inventory.get_item(mint.id, actor: user)
+      refute has_element?(view, "#item-form")
+      assert has_element?(view, "#check-done")
+    end
+
+    test "Cancel closes the sheet and keeps the item as it was", %{conn: conn, user: user} do
+      mint = item(user, %{name: "Mint"})
+      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+
+      view |> element("#edit-checked") |> render_click()
+      view |> form("#item-form", item: %{name: "Peppermint"}) |> render_change()
+      view |> element("button[phx-click=close]", "Cancel") |> render_click()
+
+      refute has_element?(view, "#item-form")
+      assert to_string(stored(user, mint).name) == "Mint"
     end
   end
 end
