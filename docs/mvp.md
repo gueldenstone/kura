@@ -21,6 +21,12 @@ Goal: never again be in a store unsure whether something is at home, and keep on
 - Each inventory row is one line: the name (tap to edit) and one stock control. Level items use a Plenty / Low / Empty selector, count items a minus / number / plus stepper next to a separate Empty button; stepping a count down to 0 also marks it empty.
 - Items that are on the list carry a small cart marker in the inventory.
 
+### Inventory check
+- The **Check** tab (`/inventory/check`, the third tab of the bar) is a walk through all items, one card at a time, the ones whose stock was changed or confirmed longest ago first. Each card shows the item, how long ago its stock last changed, the normal stock control, and a progress count ("4 of 23").
+- **Still right** confirms the stock and moves on. **Next** (or a swipe left) moves on without confirming; a swipe right or the back button goes to the previous card. **Delete** removes the item after a confirmation. Emptying an item behaves as in the list, including the Add to list offer.
+- The end of the walk shows "All checked" with a Done button back to the inventory. Leaving through another tab ends it early; nothing done so far is lost.
+- Online only. Every stock change and every confirmation updates the item's last-checked date.
+
 ### Label export
 - **Select** in the inventory switches to select mode: every row gets a checkbox in place of its stock control, search keeps working and the ticks stay, **Select all** ticks every visible item and **Select none** clears all ticks.
 - **Export labels** downloads `labels.csv` with a `Label` header and one item name per line, ordered by name, for import into label printing software (Brother P-touch). Online only.

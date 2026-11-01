@@ -26,12 +26,13 @@ import {hooks as colocatedHooks} from "phoenix-colocated/kura"
 import {hooks as cinderHooks} from "phoenix-colocated/cinder"
 import topbar from "../vendor/topbar"
 import {setupOffline} from "./offline"
+import {Swipe} from "./hooks/swipe"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...cinderHooks, ...colocatedHooks},
+  hooks: {...cinderHooks, ...colocatedHooks, Swipe},
 })
 
 // Show progress bar on live navigation and form submits

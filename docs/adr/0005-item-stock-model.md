@@ -12,6 +12,7 @@ Items are a permanent catalogue. Some are best tracked by a number (apples), oth
 - The tracking type is fixed at creation; changing it means deleting and recreating the item.
 - "Empty" is a calculation (`empty?`): count 0, or level `:empty`. "Mark empty" is its own action so milestone 4 can attach "put on the shopping list" to it.
 - Item names are unique, ignoring case, via an identity with `pre_check?` (SQLite has no real `citext`, see ADR 0004).
+- `stock_checked_at` records when the stock was last changed or confirmed. Every stock action (`change_count`, `set_count`, `set_level`, `mark_empty`, and so shopping check-off and uncheck, which go through them) and `confirm_stock` stamp it through one change, `TouchStockChecked`. Renaming an item does not. The inventory check orders all items by it, stalest first.
 - Undo of "mark empty" is held in the LiveView (the previous stock of the last item marked empty), not persisted.
 - Database tests run serially: SQLite allows one writer, so async tests fail with "Database busy".
 

@@ -123,6 +123,70 @@ defmodule Kura.Inventory.ItemTest do
     end
   end
 
+  describe "stock_checked_at" do
+    # Pushes the date into the past so that a change visibly moves it forward.
+    defp backdate(item, actor, days \\ 30) do
+      past = DateTime.add(DateTime.utc_now(), -days, :day)
+
+      item
+      |> Ash.Changeset.for_update(:update, %{}, actor: actor)
+      |> Ash.Changeset.force_change_attribute(:stock_checked_at, past)
+      |> Ash.update!()
+    end
+
+    defp touched?(item, actor, change) do
+      old = backdate(item, actor)
+      new = change.(old)
+      DateTime.compare(new.stock_checked_at, old.stock_checked_at) == :gt
+    end
+
+    test "starts out as now", %{actor: actor} do
+      assert DateTime.diff(DateTime.utc_now(), apples(actor).stock_checked_at, :second) < 5
+    end
+
+    test "moves forward when the stock changes or is confirmed", %{actor: actor} do
+      assert touched?(apples(actor), actor, &Inventory.change_item_count!(&1, 2, actor: actor))
+
+      assert touched?(
+               apples(actor, %{name: "A2"}),
+               actor,
+               &Inventory.set_item_count!(&1, 9, actor: actor)
+             )
+
+      assert touched?(walnuts(actor), actor, &Inventory.set_item_level!(&1, :low, actor: actor))
+
+      assert touched?(
+               walnuts(actor, %{name: "W2"}),
+               actor,
+               &Inventory.mark_item_empty!(&1, actor: actor)
+             )
+
+      assert touched?(
+               apples(actor, %{name: "A3"}),
+               actor,
+               &Inventory.confirm_item_stock!(&1, actor: actor)
+             )
+    end
+
+    test "stays put when only the name changes", %{actor: actor} do
+      refute touched?(
+               apples(actor),
+               actor,
+               &Inventory.update_item!(&1, %{name: "Pears"}, actor: actor)
+             )
+    end
+
+    test "list_items_to_check puts the longest unchecked first", %{actor: actor} do
+      backdate(apples(actor, %{name: "Zucchini"}), actor, 30)
+      walnuts(actor, %{name: "Almonds"})
+      backdate(walnuts(actor, %{name: "Mint"}), actor, 60)
+
+      names = Enum.map(Inventory.list_items_to_check!(actor: actor), &to_string(&1.name))
+
+      assert names == ["Mint", "Zucchini", "Almonds"]
+    end
+  end
+
   describe "mark_item_empty/2" do
     test "sets a count item to 0", %{actor: actor} do
       item = Inventory.mark_item_empty!(apples(actor, %{stock_count: 4}), actor: actor)

@@ -26,7 +26,7 @@ defmodule KuraWeb.Layouts do
   attr :open_count, :integer, default: 0, doc: "open shopping list entries, shown on its tab"
 
   attr :active, :atom,
-    values: [:shopping_list, :inventory],
+    values: [:shopping_list, :inventory, :check],
     required: true,
     doc: "the current tab"
 
@@ -59,7 +59,7 @@ defmodule KuraWeb.Layouts do
         class="fixed inset-x-0 bottom-0 z-10 border-t border-base-300 bg-base-200/90 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
         aria-label="Main"
       >
-        <div class="mx-auto grid max-w-2xl grid-cols-2 gap-2">
+        <div class="mx-auto grid max-w-2xl grid-cols-3 gap-2">
           <.tab
             href={~p"/"}
             icon="hero-shopping-cart"
@@ -70,6 +70,13 @@ defmodule KuraWeb.Layouts do
           </.tab>
           <.tab href={~p"/inventory"} icon="hero-archive-box" active={@active == :inventory}>
             Inventory
+          </.tab>
+          <.tab
+            href={~p"/inventory/check"}
+            icon="hero-clipboard-document-check"
+            active={@active == :check}
+          >
+            Check
           </.tab>
         </div>
       </nav>

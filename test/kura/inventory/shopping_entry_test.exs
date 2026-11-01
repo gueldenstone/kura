@@ -92,6 +92,22 @@ defmodule Kura.Inventory.ShoppingEntryTest do
   end
 
   describe "check_off_entry/2" do
+    test "counts as a stock change for the inventory check", %{actor: actor} do
+      item = apples(actor)
+      past = DateTime.add(DateTime.utc_now(), -30, :day)
+
+      item =
+        item
+        |> Ash.Changeset.for_update(:update, %{}, actor: actor)
+        |> Ash.Changeset.force_change_attribute(:stock_checked_at, past)
+        |> Ash.update!()
+
+      Inventory.check_off_entry!(add(actor, item), actor: actor)
+
+      restocked = Inventory.get_item!(item.id, actor: actor)
+      assert DateTime.compare(restocked.stock_checked_at, past) == :gt
+    end
+
     test "adds the quantity to a count item", %{actor: actor} do
       item = apples(actor, %{stock_count: 1})
       entry = Inventory.check_off_entry!(add(actor, item, %{quantity: 4}), actor: actor)

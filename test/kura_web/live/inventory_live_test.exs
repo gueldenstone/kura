@@ -508,4 +508,154 @@ defmodule KuraWeb.InventoryLiveTest do
       assert has_element?(view, "#export-form [data-role=selected-count]", "0 selected")
     end
   end
+
+  describe "checking the stock" do
+    defp backdate(user, item, days) do
+      item
+      |> Ash.Changeset.for_update(:update, %{}, actor: user)
+      |> Ash.Changeset.force_change_attribute(
+        :stock_checked_at,
+        DateTime.add(DateTime.utc_now(), -days, :day)
+      )
+      |> Ash.update!()
+    end
+
+    setup %{user: user} do
+      mint = backdate(user, item(user, %{name: "Mint"}), 90)
+      salt = backdate(user, item(user, %{name: "Salt"}), 30)
+      apples = item(user, %{name: "Apples"})
+      %{mint: mint, salt: salt, apples: apples}
+    end
+
+    defp start_check(conn) do
+      {:ok, view, _html} = live(conn, ~p"/inventory/check")
+      view
+    end
+
+    test "has its own tab and leaves the inventory list out", %{conn: conn} = ctx do
+      view = start_check(conn)
+
+      assert has_element?(view, "nav a[aria-current=page]", "Check")
+      refute has_element?(view, "#items")
+      refute has_element?(view, "#item-#{ctx.mint.id}")
+
+      {:ok, inventory, _html} = live(conn, ~p"/inventory")
+      assert has_element?(inventory, "nav a[aria-current=page]", "Inventory")
+      assert has_element?(inventory, "nav a[href='/inventory/check']", "Check")
+      refute has_element?(inventory, "#check-overlay")
+    end
+
+    test "walks through every item, longest unchecked first", %{conn: conn, user: user} = ctx do
+      view = start_check(conn)
+
+      assert has_element?(view, "#check-card-#{ctx.mint.id}", "Mint")
+
+      assert has_element?(
+               view,
+               "#check-card-#{ctx.mint.id} [data-role=checked-ago]",
+               "3 months ago"
+             )
+
+      assert has_element?(view, "[data-role=check-progress]", "1 of 3")
+
+      view |> element("#check-next") |> render_click()
+      assert has_element?(view, "#check-card-#{ctx.salt.id}", "Salt")
+      assert has_element?(view, "[data-role=check-progress]", "2 of 3")
+
+      view |> element("#check-prev") |> render_click()
+      assert has_element?(view, "#check-card-#{ctx.mint.id}")
+
+      # Moving on without confirming leaves the item due.
+      assert DateTime.diff(DateTime.utc_now(), stored(user, ctx.mint).stock_checked_at, :day) >=
+               89
+    end
+
+    test "Still right confirms the item and moves on", %{conn: conn, user: user} = ctx do
+      view = start_check(conn)
+
+      view |> element("#confirm-stock") |> render_click()
+
+      assert DateTime.diff(DateTime.utc_now(), stored(user, ctx.mint).stock_checked_at, :second) <
+               5
+
+      assert stored(user, ctx.mint).stock_count == ctx.mint.stock_count
+      assert has_element?(view, "#check-card-#{ctx.salt.id}")
+    end
+
+    test "changing the stock on the card updates the item", %{conn: conn, user: user} = ctx do
+      view = start_check(conn)
+
+      view
+      |> element("#check-card-#{ctx.mint.id} button[aria-label='One more']")
+      |> render_click()
+
+      assert stored(user, ctx.mint).stock_count == ctx.mint.stock_count + 1
+      assert has_element?(view, "#check-card-#{ctx.mint.id} [data-role=stock]", "2")
+      assert has_element?(view, "#check-card-#{ctx.mint.id} [data-role=checked-ago]", "today")
+    end
+
+    test "deletes the item on the card and shows the next one", %{conn: conn, user: user} = ctx do
+      view = start_check(conn)
+
+      view |> element("#delete-checked") |> render_click()
+
+      assert {:error, _} = Inventory.get_item(ctx.mint.id, actor: user)
+      assert has_element?(view, "#check-card-#{ctx.salt.id}")
+      assert has_element?(view, "[data-role=check-progress]", "1 of 2")
+    end
+
+    test "swiping left goes on, right goes back, and the ends say so", %{conn: conn} = ctx do
+      view = start_check(conn)
+
+      assert render_hook(view, "swipe_prev", %{}) =~ "Mint"
+      assert has_element?(view, "#check-card-#{ctx.mint.id}")
+
+      render_hook(view, "swipe_next", %{})
+      assert has_element?(view, "#check-card-#{ctx.salt.id}")
+
+      render_hook(view, "swipe_prev", %{})
+      assert has_element?(view, "#check-card-#{ctx.mint.id}")
+    end
+
+    test "shows an all-checked card after the last item that leads back to the inventory", %{
+      conn: conn
+    } do
+      view = start_check(conn)
+
+      for _ <- 1..3, do: view |> element("#check-next") |> render_click()
+
+      assert has_element?(view, "#check-done", "All checked")
+      assert has_element?(view, "[data-role=check-progress]", "3 of 3")
+
+      assert {:error, {:live_redirect, %{to: "/inventory"}}} =
+               view |> element("#check-done a") |> render_click()
+    end
+
+    test "an item the other person deletes drops out of the check",
+         %{
+           conn: conn,
+           user: user
+         } = ctx do
+      view = start_check(conn)
+
+      Inventory.delete_item!(ctx.mint, actor: user)
+      send(view.pid, %Phoenix.Socket.Broadcast{topic: "kitchen:changed", event: "update"})
+
+      assert has_element?(view, "#check-card-#{ctx.salt.id}")
+      assert has_element?(view, "[data-role=check-progress]", "1 of 2")
+    end
+
+    test "emptying an item during the check works like in the list",
+         %{conn: conn, user: user} = ctx do
+      view = start_check(conn)
+
+      view
+      |> element("#check-card-#{ctx.mint.id} button[phx-click=mark_empty]")
+      |> render_click()
+
+      assert stored(user, ctx.mint).stock_count == 0
+      assert has_element?(view, "#undo", "Mint marked empty")
+      assert [_entry] = Inventory.list_open_entries!(actor: user)
+    end
+  end
 end

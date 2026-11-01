@@ -25,10 +25,11 @@ Planned features after the MVP, in order.
 |---|-----------|---------|--------|
 | 7 | Label CSV export | Select inventory items and download their names as a plain CSV with the column header `Label`, for label printing | Done |
 | 8 | Optional replenishment | Per item: auto-replenish or not. Auto-replenish items go on the shopping list when marked empty; other items only get an Add to list offer in the Undo bar, since they are not regular stock | Done |
-| 9 | Inventory check mode | Each item tracks when its stock last changed. A guided mode walks through the stalest items, asks to confirm the current stock and offers a quick way to update it | Next |
+| 9 | Inventory check mode | Each item tracks when its stock last changed. A guided mode walks through the stalest items, asks to confirm the current stock and offers a quick way to update it | Done |
 
 ## After the MVP (unordered ideas)
 
+- Locations or cupboards, so the inventory check can go through one cupboard at a time
 - Low-stock thresholds for count items that auto-add to the list
 - Categories or store-aisle ordering of the shopping list
 - Broader history beyond check-off undo

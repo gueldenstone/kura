@@ -36,6 +36,8 @@ defmodule Kura.Inventory.Item do
 
       argument :delta, :integer, allow_nil?: false
 
+      change Kura.Inventory.Item.Changes.TouchStockChecked
+
       validate attribute_equals(:tracking, :count),
         message: "only count items have a count"
 
@@ -57,6 +59,7 @@ defmodule Kura.Inventory.Item do
         message: "only count items have a count"
 
       change set_attribute(:stock_count, arg(:count))
+      change Kura.Inventory.Item.Changes.TouchStockChecked
     end
 
     update :set_level do
@@ -69,6 +72,15 @@ defmodule Kura.Inventory.Item do
         message: "only level items have a level"
 
       change set_attribute(:stock_level, arg(:level))
+      change Kura.Inventory.Item.Changes.TouchStockChecked
+    end
+
+    update :confirm_stock do
+      description "Records that the stock was checked and found right, without changing it."
+      accept []
+      require_atomic? false
+
+      change Kura.Inventory.Item.Changes.TouchStockChecked
     end
 
     update :mark_empty do
@@ -83,6 +95,7 @@ defmodule Kura.Inventory.Item do
         end
       end
 
+      change Kura.Inventory.Item.Changes.TouchStockChecked
       change Kura.Inventory.Item.Changes.PutOnList
     end
 
@@ -97,6 +110,12 @@ defmodule Kura.Inventory.Item do
       filter expr(contains(name, ^arg(:query)))
 
       prepare build(sort: [name: :asc])
+    end
+
+    read :to_check do
+      description "All items, the ones whose stock was checked or changed longest ago first."
+
+      prepare build(sort: [stock_checked_at: :asc, name: :asc])
     end
 
     read :by_ids do
@@ -163,6 +182,13 @@ defmodule Kura.Inventory.Item do
       public? true
       default 1
       constraints min: 1
+    end
+
+    attribute :stock_checked_at, :utc_datetime_usec do
+      description "When the stock was last changed or confirmed, which is what the inventory check goes by."
+      allow_nil? false
+      public? true
+      default &DateTime.utc_now/0
     end
 
     timestamps()
