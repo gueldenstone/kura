@@ -215,6 +215,90 @@ defmodule KuraWeb.InventoryLiveTest do
     end
   end
 
+  describe "changing the tracking type" do
+    test "an empty count item becomes an empty level item, suggested in the form", %{
+      conn: conn,
+      user: user
+    } do
+      apples = item(user, %{name: "Apples", stock_count: 0})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
+      choose(view, "tracking", "level")
+      assert has_element?(view, "#item-form button[phx-value-choice=empty][aria-pressed=true]")
+
+      choose(view, "stock_level", "low")
+      submit_item_form(view)
+
+      assert %{tracking: :level, stock_level: :low, stock_count: nil} = stored(user, apples)
+
+      assert has_element?(
+               view,
+               "#item-#{apples.id} [data-role=stock] button[aria-pressed=true]",
+               "Low"
+             )
+    end
+
+    test "a level item becomes a count item with the count given", %{conn: conn, user: user} do
+      walnuts = item(user, %{name: "Walnuts", tracking: :level, stock_level: :low})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{walnuts.id} button[phx-click=edit]") |> render_click()
+      choose(view, "tracking", "count")
+      assert has_element?(view, "#item-form", "In stock now")
+      step(view, "stock_count", 1, 2)
+      submit_item_form(view)
+
+      assert %{tracking: :count, stock_count: 3} = stored(user, walnuts)
+    end
+
+    test "going to none hides auto-replenish and turns it off", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples"})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
+      assert has_element?(view, "#item-form input[name='item[auto_replenish]']")
+      choose(view, "tracking", "none")
+      refute has_element?(view, "#item-form input[name='item[auto_replenish]']")
+      submit_item_form(view)
+
+      assert %{tracking: :none, auto_replenish: false, stock_count: nil} = stored(user, apples)
+      assert has_element?(view, "#item-#{apples.id} [data-role=stock]", "Add to list")
+    end
+
+    test "the undo bar of an item that changed its type goes away", %{conn: conn, user: user} do
+      apples = item(user, %{name: "Apples", stock_count: 2})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{apples.id} button[phx-click=mark_empty]") |> render_click()
+      assert has_element?(view, "#undo")
+
+      view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
+      choose(view, "tracking", "level")
+      submit_item_form(view)
+
+      refute has_element?(view, "#undo")
+    end
+
+    test "an item switched to none during the check drops out of the walk", %{
+      conn: conn,
+      user: user
+    } do
+      walnuts = item(user, %{name: "Walnuts", tracking: :level})
+      rice = item(user, %{name: "Rice", tracking: :level})
+      {:ok, view, _html} = live(conn, ~p"/inventory/check/all")
+      first = if has_element?(view, "#check-card-#{walnuts.id}"), do: walnuts, else: rice
+      other = if first == walnuts, do: rice, else: walnuts
+
+      view |> element("#edit-checked") |> render_click()
+      choose(view, "tracking", "none")
+      submit_item_form(view)
+
+      assert has_element?(view, "#check-card-#{other.id}")
+      assert has_element?(view, "[data-role=check-progress]", "1 of 1")
+    end
+  end
+
   describe "items without stock" do
     test "have no stock control, only a button that puts them on the list", %{
       conn: conn,
@@ -484,12 +568,16 @@ defmodule KuraWeb.InventoryLiveTest do
       refute stored(user, mint).auto_replenish
     end
 
-    test "the form asks for stock only when adding, not when editing", %{conn: conn, user: user} do
+    test "the form asks for the starting stock only when adding or switching the type", %{
+      conn: conn,
+      user: user
+    } do
       apples = item(user, %{name: "Apples"})
       {:ok, view, _html} = live(conn, ~p"/inventory")
 
       view |> element("#item-#{apples.id} button[phx-click=edit]") |> render_click()
-      refute has_element?(view, "#item-form button[phx-value-field=tracking]")
+      assert has_element?(view, "#item-form button[phx-value-choice=count][aria-pressed=true]")
+      refute has_element?(view, "#item-form", "In stock now")
       assert has_element?(view, "#item-form [data-role=usual_amount]", "1")
       assert has_element?(view, "button[phx-click=delete]", "Delete")
 

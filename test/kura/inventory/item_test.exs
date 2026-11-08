@@ -236,7 +236,7 @@ defmodule Kura.Inventory.ItemTest do
   end
 
   describe "updating and deleting" do
-    test "update_item changes name and usual amount but not the tracking type", %{actor: actor} do
+    test "update_item changes name and usual amount", %{actor: actor} do
       item =
         Inventory.update_item!(apples(actor), %{name: "Green apples", usual_amount: 4},
           actor: actor
@@ -245,9 +245,6 @@ defmodule Kura.Inventory.ItemTest do
       assert to_string(item.name) == "Green apples"
       assert item.usual_amount == 4
       assert item.tracking == :count
-
-      assert {:error, %Ash.Error.Invalid{}} =
-               Inventory.update_item(item, %{tracking: :level}, actor: actor)
     end
 
     test "delete_item removes the item", %{actor: actor} do
@@ -312,6 +309,66 @@ defmodule Kura.Inventory.ItemTest do
 
       [shelf] = Inventory.list_locations!(actor: actor, load: [:stock_item_count])
       assert {shelf.item_count, shelf.stock_item_count} == {2, 1}
+    end
+  end
+
+  describe "changing the tracking type" do
+    defp switch(item, attrs, actor), do: Inventory.update_item!(item, attrs, actor: actor)
+
+    test "carries the stock over: empty stays empty, anything else is 1 or plenty", %{
+      actor: actor
+    } do
+      assert %{stock_level: :plenty, stock_count: nil} =
+               switch(apples(actor, %{stock_count: 3}), %{tracking: :level}, actor)
+
+      assert %{stock_level: :empty} =
+               switch(apples(actor, %{name: "Pears", stock_count: 0}), %{tracking: :level}, actor)
+
+      assert %{stock_count: 1, stock_level: nil} =
+               switch(walnuts(actor, %{stock_level: :low}), %{tracking: :count}, actor)
+
+      assert %{stock_count: 0} =
+               switch(
+                 walnuts(actor, %{name: "Pecans", stock_level: :empty}),
+                 %{tracking: :count},
+                 actor
+               )
+    end
+
+    test "takes the stock given for the new type", %{actor: actor} do
+      assert %{stock_count: 7} =
+               switch(walnuts(actor), %{tracking: :count, stock_count: 7}, actor)
+
+      candles = Inventory.create_item!(%{name: "Candles", tracking: :none}, actor: actor)
+      assert %{stock_level: :low} = switch(candles, %{tracking: :level, stock_level: :low}, actor)
+    end
+
+    test "to none drops the stock and auto-replenish", %{actor: actor} do
+      item = switch(apples(actor, %{auto_replenish: true}), %{tracking: :none}, actor)
+
+      assert %{tracking: :none, stock_count: nil, stock_level: nil, auto_replenish: false} = item
+    end
+
+    test "counts as a stock change for the inventory check", %{actor: actor} do
+      item =
+        Ash.Seed.update!(walnuts(actor), %{stock_checked_at: ~U[2026-01-01 00:00:00.000000Z]})
+
+      assert DateTime.compare(
+               switch(item, %{tracking: :count}, actor).stock_checked_at,
+               ~U[2026-01-01 00:00:00.000000Z]
+             ) == :gt
+    end
+
+    test "without a new type the update leaves the stock and its date alone", %{actor: actor} do
+      item =
+        Ash.Seed.update!(apples(actor, %{stock_count: 3}), %{
+          stock_checked_at: ~U[2026-01-01 00:00:00.000000Z]
+        })
+
+      item = switch(item, %{tracking: :count, stock_count: 9, name: "Red apples"}, actor)
+
+      assert item.stock_count == 3
+      assert item.stock_checked_at == ~U[2026-01-01 00:00:00.000000Z]
     end
   end
 end

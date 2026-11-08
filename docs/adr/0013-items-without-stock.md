@@ -1,6 +1,6 @@
 # 0013. Items without stock tracking
 
-- Status: Accepted
+- Status: Accepted; the fixed tracking type is superseded by 0014
 - Date: 2026-11-08
 
 ## Context

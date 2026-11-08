@@ -2,7 +2,8 @@ defmodule Kura.Inventory.Item do
   @moduledoc """
   A kitchen item in the permanent catalogue. Items are never removed when they run out;
   they are just empty. Each item tracks its stock as a `:count` or as a `:level`, or not at all
-  (`:none`) for things that are only ever bought when needed.
+  (`:none`) for things that are only ever bought when needed. The tracking type can be changed later;
+  the stock is then carried over (`converted_stock/2`).
   """
   use Ash.Resource,
     otp_app: :kura,
@@ -32,13 +33,15 @@ defmodule Kura.Inventory.Item do
     end
 
     update :update do
+      description "Changes the item's details. A new tracking type takes the stock given, or carries the old stock over."
       primary? true
-      accept [:name, :usual_amount, :auto_replenish]
+      accept [:name, :usual_amount, :auto_replenish, :tracking, :stock_count, :stock_level]
       require_atomic? false
 
       argument :tag_ids, {:array, :uuid}, constraints: [remove_nil_items?: true]
       argument :location_ids, {:array, :uuid}, constraints: [remove_nil_items?: true]
 
+      change Kura.Inventory.Item.Changes.SwitchTracking
       change Kura.Inventory.Item.Changes.SetTags
       change manage_relationship(:location_ids, :locations, type: :append_and_remove)
     end
@@ -268,6 +271,26 @@ defmodule Kura.Inventory.Item do
       pre_check?: true,
       message: "is already in the inventory with these tags"
   end
+
+  @doc """
+  The stock an item would start with when it switches to another tracking type, as close to its
+  current stock as the new type allows: empty stays empty, any other stock becomes a count of 1 or
+  plenty, and an item without stock starts at the same values as a new item.
+  """
+  def converted_stock(%{tracking: tracking} = item, tracking),
+    do: %{stock_count: item.stock_count, stock_level: item.stock_level}
+
+  def converted_stock(_item, :none), do: %{stock_count: nil, stock_level: nil}
+
+  def converted_stock(item, :count),
+    do: %{stock_count: if(stock_empty?(item), do: 0, else: 1), stock_level: nil}
+
+  def converted_stock(item, :level),
+    do: %{stock_count: nil, stock_level: if(stock_empty?(item), do: :empty, else: :plenty)}
+
+  defp stock_empty?(%{tracking: :count, stock_count: 0}), do: true
+  defp stock_empty?(%{tracking: :level, stock_level: :empty}), do: true
+  defp stock_empty?(_item), do: false
 
   @doc "The string that stands for a set of tag ids in `tag_key`."
   def tag_key(tag_ids), do: tag_ids |> Enum.map(&to_string/1) |> Enum.sort() |> Enum.join(",")

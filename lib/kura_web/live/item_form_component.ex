@@ -1,7 +1,7 @@
 defmodule KuraWeb.ItemFormComponent do
   @moduledoc """
-  The one screen for adding and editing an item: name, tags, stock (new items only) and buying
-  details. It renders `variant={:inline}` as a card inside a page, or `variant={:sheet}` as a sheet
+  The one screen for adding and editing an item: name, tags, how the stock is tracked (with the
+  starting stock for a new item, or for an item that switches to another type) and buying details. It renders `variant={:inline}` as a card inside a page, or `variant={:sheet}` as a sheet
   over it. The parent tells it what to show and hears back through messages to its own process:
 
     * `{:item_form, :saved, item}`
@@ -104,6 +104,22 @@ defmodule KuraWeb.ItemFormComponent do
       {:error, form} ->
         {:noreply, assign(socket, form: to_form(form))}
     end
+  end
+
+  # Switching an existing item to another tracking type suggests a stock close to the one it has.
+  def handle_event(
+        "set",
+        %{"field" => "tracking", "choice" => choice},
+        %{assigns: %{item: %Item{} = item}} = socket
+      ) do
+    stock = Item.converted_stock(item, String.to_existing_atom(choice))
+
+    {:noreply,
+     revalidate(socket, %{
+       "tracking" => choice,
+       "stock_count" => to_string(stock.stock_count),
+       "stock_level" => to_string(stock.stock_level)
+     })}
   end
 
   def handle_event("set", %{"field" => field, "choice" => choice}, socket),
@@ -240,8 +256,14 @@ defmodule KuraWeb.ItemFormComponent do
   defp tracking_hint(_none), do: "No stock, only bought when needed, like birthday candles."
 
   # Items without stock never run out, so auto-replenish has nothing to react to.
-  defp tracks_stock?(form, nil), do: to_string(form[:tracking].value) != "none"
-  defp tracks_stock?(_form, %Item{tracking: tracking}), do: tracking != :none
+  defp tracks_stock?(form), do: to_string(form[:tracking].value) != "none"
+
+  # The starting stock is asked for when adding an item, and when an item changes its tracking
+  # type; otherwise the stock is changed in the list.
+  defp asks_stock?(form, nil, tracking), do: to_string(form[:tracking].value) == tracking
+
+  defp asks_stock?(form, %Item{} = item, tracking),
+    do: to_string(form[:tracking].value) == tracking and to_string(item.tracking) != tracking
 
   defp title(nil), do: "New item"
   defp title(item), do: "Edit #{item.name}"
@@ -390,7 +412,7 @@ defmodule KuraWeb.ItemFormComponent do
         />
       </section>
 
-      <section :if={new?(@item)}>
+      <section>
         <.heading>Stock</.heading>
         <input type="hidden" name="item[tracking]" value={@form[:tracking].value} />
         <input type="hidden" name="item[stock_level]" value={@form[:stock_level].value} />
@@ -412,7 +434,7 @@ defmodule KuraWeb.ItemFormComponent do
         </p>
 
         <div
-          :if={to_string(@form[:tracking].value) == "level"}
+          :if={asks_stock?(@form, @item, "level")}
           class="mt-3 flex gap-0.5 rounded-full bg-base-300/60 p-[3px]"
         >
           <.choice
@@ -429,7 +451,7 @@ defmodule KuraWeb.ItemFormComponent do
         </div>
 
         <div
-          :if={to_string(@form[:tracking].value) == "count"}
+          :if={asks_stock?(@form, @item, "count")}
           class="mt-3 flex items-center justify-between"
         >
           <span class="font-bold">In stock now</span>
@@ -446,7 +468,7 @@ defmodule KuraWeb.ItemFormComponent do
         </div>
 
         <label
-          :if={tracks_stock?(@form, @item)}
+          :if={tracks_stock?(@form)}
           class="mt-4 flex cursor-pointer items-center justify-between gap-4"
         >
           <span class="min-w-0">

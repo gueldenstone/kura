@@ -237,8 +237,12 @@ defmodule KuraWeb.InventoryLive do
      |> load_items()}
   end
 
-  def handle_info({:item_form, :saved, _item}, socket) do
-    {:noreply, socket |> assign(editing: nil, edit_item: nil) |> load_items()}
+  def handle_info({:item_form, :saved, item}, socket) do
+    {:noreply,
+     socket
+     |> assign(editing: nil, edit_item: nil)
+     |> drop_stale_undo(item)
+     |> load_items()}
   end
 
   def handle_info({:item_form, :deleted, _item}, socket) do
@@ -329,7 +333,10 @@ defmodule KuraWeb.InventoryLive do
   defp scope_title(:unplaced), do: "Not placed yet"
   defp scope_title({:location, location}), do: to_string(location.name)
 
-  # An item that left the place being walked (the other phone took it out) is not checked here.
+  # An item that left the place being walked (the other phone took it out) is not checked here,
+  # nor one that no longer keeps stock.
+  defp in_scope?(%Item{tracking: :none}, _scope), do: false
+
   defp in_scope?(item, {:location, location}),
     do: Enum.any?(item.locations, &(&1.id == location.id))
 
@@ -455,6 +462,17 @@ defmodule KuraWeb.InventoryLive do
 
     {:noreply, socket |> show_undo(undo) |> load_items()}
   end
+
+  # The undo bar remembers the stock of the item's old tracking type, which cannot be restored once
+  # the type has changed.
+  defp drop_stale_undo(%{assigns: %{undo: %{id: id, previous: {tracking, _}}}} = socket, %Item{
+         id: id,
+         tracking: new_tracking
+       })
+       when new_tracking != tracking,
+       do: assign(socket, undo: nil)
+
+  defp drop_stale_undo(socket, _item), do: socket
 
   # The undo bar goes away on its own; a newer bar is not closed by an older timer.
   defp show_undo(socket, undo) do
