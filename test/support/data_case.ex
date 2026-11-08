@@ -38,6 +38,9 @@ defmodule Kura.DataCase do
   def setup_sandbox(tags) do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Kura.Repo, shared: not tags[:async])
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+
+    # Failed sign-ins are counted in memory, across tests; async tests never sign in.
+    unless tags[:async], do: Kura.Accounts.SignInThrottle.clear()
   end
 
   @doc """

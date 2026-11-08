@@ -8,7 +8,9 @@ defmodule KuraWeb.Endpoint do
     store: :cookie,
     key: "_kura_key",
     signing_salt: "Ph9KjvpK",
-    same_site: "Lax"
+    same_site: "Lax",
+    # Only over HTTPS in production; development runs on plain http://localhost.
+    secure: Application.compile_env(:kura, :secure_cookies, false)
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

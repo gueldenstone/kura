@@ -61,6 +61,7 @@ defmodule Kura.Accounts.User do
         allow_nil? true
       end
 
+      prepare Kura.Accounts.User.Preparations.ThrottleSignIn
       prepare AshAuthentication.Strategy.Password.SignInPreparation
 
       prepare {AshAuthentication.Strategy.RememberMe.MaybeGenerateTokenPreparation,

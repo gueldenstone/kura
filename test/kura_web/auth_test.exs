@@ -88,6 +88,25 @@ defmodule KuraWeb.AuthTest do
     end
   end
 
+  describe "too many wrong passwords" do
+    test "the sign-in form says so instead of checking the password", %{conn: conn} do
+      %{password: password} = create_user("lukas")
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      submit = fn password ->
+        view
+        |> form("#user-password-sign-in-with-password",
+          user: %{username: "lukas", password: password}
+        )
+        |> render_submit()
+      end
+
+      for _ <- 1..Kura.Accounts.SignInThrottle.max_failures(), do: submit.("not the password")
+
+      assert submit.(password) =~ "Too many failed attempts. Try again in 15 min."
+    end
+  end
+
   describe "when logged in" do
     setup :log_in_user
 

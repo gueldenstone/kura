@@ -19,6 +19,9 @@ config :kura, KuraWeb.Endpoint,
     ]
   ]
 
+# The session cookie is only sent over HTTPS (see KuraWeb.Endpoint).
+config :kura, secure_cookies: true
+
 # Configure Swoosh API Client
 config :swoosh, api_client: Swoosh.ApiClient.Req
 
