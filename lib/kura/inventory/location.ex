@@ -69,6 +69,11 @@ defmodule Kura.Inventory.Location do
 
   aggregates do
     count :item_count, :items
+
+    count :stock_item_count, :items do
+      description "The items in this place that have stock, which is what the inventory check walks."
+      filter expr(tracking != :none)
+    end
   end
 
   identities do

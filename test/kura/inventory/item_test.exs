@@ -268,4 +268,50 @@ defmodule Kura.Inventory.ItemTest do
                Inventory.create_item(%{name: "Rice", tracking: :count})
     end
   end
+
+  describe "items without stock" do
+    defp candles(actor, attrs \\ %{}) do
+      Inventory.create_item!(Map.merge(%{name: "Candles", tracking: :none}, attrs), actor: actor)
+    end
+
+    test "keep no stock and do not auto-replenish, whatever was given", %{actor: actor} do
+      item = candles(actor, %{stock_count: 3, stock_level: :low, auto_replenish: true})
+
+      assert item.tracking == :none
+      assert item.stock_count == nil
+      assert item.stock_level == nil
+      assert item.auto_replenish == false
+    end
+
+    test "are never empty and cannot be marked empty or given a stock", %{actor: actor} do
+      item = candles(actor)
+
+      assert Ash.load!(item, :empty?, actor: actor).empty? == false
+      assert {:error, _} = Inventory.mark_item_empty(item, actor: actor)
+      assert {:error, _} = Inventory.change_item_count(item, 1, actor: actor)
+      assert {:error, _} = Inventory.set_item_level(item, :plenty, actor: actor)
+    end
+
+    test "are left out of the inventory check", %{actor: actor} do
+      shelf = Inventory.create_location!(%{name: "Shelf"}, actor: actor)
+      candles(actor, %{location_ids: [shelf.id]})
+      candles(actor, %{name: "Foil"})
+
+      rice =
+        Inventory.create_item!(%{name: "Rice", tracking: :level, location_ids: [shelf.id]},
+          actor: actor
+        )
+
+      assert Enum.map(Inventory.list_items_to_check!(actor: actor), & &1.id) == [rice.id]
+
+      assert Enum.map(Inventory.list_items_to_check_at!(shelf.id, actor: actor), & &1.id) == [
+               rice.id
+             ]
+
+      assert Inventory.list_items_to_check_unplaced!(actor: actor) == []
+
+      [shelf] = Inventory.list_locations!(actor: actor, load: [:stock_item_count])
+      assert {shelf.item_count, shelf.stock_item_count} == {2, 1}
+    end
+  end
 end

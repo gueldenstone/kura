@@ -1,6 +1,6 @@
 # 0005. Items with per-item stock tracking in one resource
 
-- Status: Accepted
+- Status: Accepted, extended by 0013 (a third tracking type, `:none`)
 - Date: 2026-10-31
 
 ## Context

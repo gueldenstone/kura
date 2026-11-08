@@ -55,7 +55,7 @@ defmodule KuraWeb.ItemFormComponent do
         actor: actor(socket),
         params: %{
           "name" => prefill.name,
-          "tracking" => "level",
+          "tracking" => "none",
           "stock_level" => "plenty",
           "stock_count" => "1",
           "usual_amount" => "1",
@@ -235,6 +235,14 @@ defmodule KuraWeb.ItemFormComponent do
 
   defp new?(item), do: is_nil(item)
 
+  defp tracking_hint("level"), do: "Plenty, low or empty, like walnuts."
+  defp tracking_hint("count"), do: "A number, like apples."
+  defp tracking_hint(_none), do: "No stock, only bought when needed, like birthday candles."
+
+  # Items without stock never run out, so auto-replenish has nothing to react to.
+  defp tracks_stock?(form, nil), do: to_string(form[:tracking].value) != "none"
+  defp tracks_stock?(_form, %Item{tracking: tracking}), do: tracking != :none
+
   defp title(nil), do: "New item"
   defp title(item), do: "Edit #{item.name}"
 
@@ -389,7 +397,7 @@ defmodule KuraWeb.ItemFormComponent do
         <input type="hidden" name="item[stock_count]" value={@form[:stock_count].value} />
         <div class="flex gap-0.5 rounded-full bg-base-300/60 p-[3px]">
           <.choice
-            :for={{value, label} <- [{"level", "Level"}, {"count", "Count"}]}
+            :for={{value, label} <- [{"none", "None"}, {"level", "Level"}, {"count", "Count"}]}
             field="tracking"
             value={value}
             current={to_string(@form[:tracking].value)}
@@ -399,10 +407,8 @@ defmodule KuraWeb.ItemFormComponent do
             {label}
           </.choice>
         </div>
-        <p class="mt-1.5 text-[13px] text-base-content/55">
-          {if to_string(@form[:tracking].value) == "level",
-            do: "Plenty, low or empty, like walnuts.",
-            else: "A number, like apples."}
+        <p data-role="tracking-hint" class="mt-1.5 text-[13px] text-base-content/55">
+          {tracking_hint(to_string(@form[:tracking].value))}
         </p>
 
         <div
@@ -439,7 +445,10 @@ defmodule KuraWeb.ItemFormComponent do
           <.stepper field="usual_amount" value={@form[:usual_amount].value} target={@myself} />
         </div>
 
-        <label class="mt-4 flex cursor-pointer items-center justify-between gap-4">
+        <label
+          :if={tracks_stock?(@form, @item)}
+          class="mt-4 flex cursor-pointer items-center justify-between gap-4"
+        >
           <span class="min-w-0">
             <span class="block font-bold">Auto-replenish</span>
             <span class="block text-[13px] text-base-content/55">

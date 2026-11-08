@@ -52,7 +52,7 @@ const byName = (a, b) => a.name.localeCompare(b.name, undefined, {sensitivity: "
 
 function restock(item, quantity) {
   if (item.tracking === "count") item.stock_count = (item.stock_count ?? 0) + quantity
-  else item.stock_level = "plenty"
+  else if (item.tracking === "level") item.stock_level = "plenty"
   item.empty = false
   item.on_list = false
 }

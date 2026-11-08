@@ -215,6 +215,34 @@ defmodule KuraWeb.InventoryLiveTest do
     end
   end
 
+  describe "items without stock" do
+    test "have no stock control, only a button that puts them on the list", %{
+      conn: conn,
+      user: user
+    } do
+      candles = item(user, %{name: "Candles", tracking: :none})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      refute has_element?(view, "#item-#{candles.id} button[phx-click=mark_empty]")
+      view |> element("#item-#{candles.id} [data-role=stock]", "Add to list") |> render_click()
+
+      assert [%{item_id: item_id}] = Inventory.list_open_entries!(actor: user)
+      assert item_id == candles.id
+      assert has_element?(view, "#item-#{candles.id} [data-role=stock][disabled]", "On list")
+      refute has_element?(view, "#item-#{candles.id} [data-role=on-list]")
+    end
+
+    test "editing one does not offer auto-replenish", %{conn: conn, user: user} do
+      candles = item(user, %{name: "Candles", tracking: :none})
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+
+      view |> element("#item-#{candles.id} button[phx-click=edit]") |> render_click()
+
+      assert has_element?(view, "#item-form")
+      refute has_element?(view, "#item-form input[name='item[auto_replenish]']")
+    end
+  end
+
   describe "the shopping list" do
     test "an item on the list carries a marker, which goes once it is checked off", %{
       conn: conn,
@@ -333,18 +361,19 @@ defmodule KuraWeb.InventoryLiveTest do
 
       [walnuts] = Inventory.search_items!("", actor: user)
       assert to_string(walnuts.name) == "Walnuts"
-      assert walnuts.tracking == :level
+      assert walnuts.tracking == :none
       assert walnuts.usual_amount == 2
       refute walnuts.auto_replenish
       assert has_element?(view, "#item-#{walnuts.id}")
       refute has_element?(view, "#item-form")
     end
 
-    test "defaults to level tracking and sets the stock right away", %{conn: conn, user: user} do
+    test "sets the level right away for level items", %{conn: conn, user: user} do
       {:ok, view, _html} = live(conn, ~p"/inventory")
       view |> form("#search-form", search: %{query: "Walnuts"}) |> render_change()
       view |> element("#add-item button") |> render_click()
 
+      choose(view, "tracking", "level")
       choose(view, "stock_level", "low")
       view |> form("#item-form") |> render_submit()
 
@@ -365,6 +394,24 @@ defmodule KuraWeb.InventoryLiveTest do
       [apples] = Inventory.search_items!("", actor: user)
       assert apples.tracking == :count
       assert apples.stock_count == 6
+    end
+
+    test "defaults to no stock, which hides the stock and auto-replenish", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/inventory")
+      view |> form("#search-form", search: %{query: "Candles"}) |> render_change()
+      view |> element("#add-item button") |> render_click()
+
+      assert has_element?(view, "#item-form button[phx-value-choice=none][aria-pressed=true]")
+      refute has_element?(view, "#item-form button[phx-value-field=stock_level]")
+      refute has_element?(view, "#item-form input[name='item[auto_replenish]']")
+      submit_item_form(view)
+
+      [candles] = Inventory.search_items!("", actor: user)
+      assert candles.tracking == :none
+      assert candles.stock_level == nil
     end
 
     test "pressing enter in the search opens the add form like the button", %{

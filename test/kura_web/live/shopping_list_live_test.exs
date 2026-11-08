@@ -159,7 +159,7 @@ defmodule KuraWeb.ShoppingListLiveTest do
 
       [entry] = Inventory.list_open_entries!(actor: user)
       assert to_string(entry.item.name) == "Walnuts"
-      assert entry.item.tracking == :level
+      assert entry.item.tracking == :none
       assert entry.quantity == 2
       assert has_element?(view, "#entry-#{entry.id}")
     end

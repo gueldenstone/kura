@@ -29,6 +29,7 @@ Planned features after the MVP, in order.
 | 10 | Tags | Shared, user-extendable tags tell items apart (ADR 0010): searchable picker in the item forms, a Tags page behind a three-dots More entry in the bottom bar, tags shown under item names, in search, check cards, the shopping list and on labels | Done |
 | 11 | Locations | Shared, user-extendable locations (cupboards, drawers, fridge), several per item; the Check tab picks one location and walks its items, with a hint when an item is also somewhere else (specification in `docs/locations.md`) | Done |
 | 12 | QR codes on containers | A short code per item, a `Link` column in the label export for QR labels, a quick-update page behind the link and a Scan button in the app (specification in `docs/qr-codes.md`) | On hold |
+| 13 | Items without stock | A third tracking type, None, for things only bought when needed: no stock control, an Add to list button in the inventory, left out of the check (ADR 0013) | Done |
 
 ## After the MVP (unordered ideas)
 

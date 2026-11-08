@@ -184,6 +184,13 @@ defmodule KuraWeb.InventoryLive do
     with_item(socket, id, &mark_empty(socket, &1))
   end
 
+  def handle_event("put_on_list", %{"id" => id}, socket) do
+    with_item(socket, id, fn item ->
+      ShoppingList.put_on_list(item, actor(socket))
+      {:noreply, load_items(socket)}
+    end)
+  end
+
   def handle_event(
         "add_to_list",
         _params,
@@ -311,7 +318,7 @@ defmodule KuraWeb.InventoryLive do
 
     assign(socket,
       check_choices: %{
-        locations: Inventory.list_locations!(actor: actor),
+        locations: Inventory.list_locations!(actor: actor, load: [:stock_item_count]),
         unplaced: length(Inventory.list_items_to_check_unplaced!(actor: actor)),
         all: length(Inventory.list_items_to_check!(actor: actor))
       }
@@ -669,7 +676,7 @@ defmodule KuraWeb.InventoryLive do
               id={"pick-#{location.id}"}
               href={~p"/inventory/check/#{location.id}"}
               title={to_string(location.name)}
-              count={location.item_count}
+              count={location.stock_item_count}
             />
           </li>
           <li>
@@ -837,7 +844,7 @@ defmodule KuraWeb.InventoryLive do
                   locations={@query != ""}
                 />
                 <span
-                  :if={item.on_list?}
+                  :if={item.on_list? and item.tracking != :none}
                   data-role="on-list"
                   title="On the shopping list"
                   class="grid size-[22px] shrink-0 place-items-center rounded-full bg-primary text-primary-content"
@@ -956,6 +963,30 @@ defmodule KuraWeb.InventoryLive do
       </div>
       <.empty_button item={@item} />
     </div>
+    """
+  end
+
+  # Items without stock have nothing to adjust; their one action is putting them on the list.
+  defp stock_control(%{item: %Item{tracking: :none}} = assigns) do
+    ~H"""
+    <button
+      type="button"
+      data-role="stock"
+      phx-click="put_on_list"
+      phx-value-id={@item.id}
+      disabled={@item.on_list?}
+      class={[
+        "flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold transition active:scale-95",
+        !@item.on_list? && "bg-primary/10 text-primary hover:bg-primary/20",
+        @item.on_list? && "bg-primary text-primary-content shadow-sm"
+      ]}
+    >
+      <.icon
+        name={if @item.on_list?, do: "hero-shopping-cart-solid", else: "hero-plus"}
+        class="size-4"
+      />
+      {if @item.on_list?, do: "On list", else: "Add to list"}
+    </button>
     """
   end
 

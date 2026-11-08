@@ -64,13 +64,16 @@ export function inventoryRows(items, query) {
     <li class="flex items-center gap-3 rounded-box bg-base-100 py-3 pr-4 pl-4 shadow-card">
       <span class="flex min-w-0 flex-1 items-center gap-2">
         <span class="truncate text-[17px] font-bold ${item.empty ? "text-base-content/60" : ""}">${escapeHtml(item.name)}</span>
-        ${item.on_list ? `<span title="On the shopping list" class="grid size-[22px] shrink-0 place-items-center rounded-full bg-primary text-primary-content"><span class="hero-shopping-cart-solid size-2.5"></span></span>` : ""}
+        ${item.on_list && item.tracking !== "none" ? `<span title="On the shopping list" class="grid size-[22px] shrink-0 place-items-center rounded-full bg-primary text-primary-content"><span class="hero-shopping-cart-solid size-2.5"></span></span>` : ""}
       </span>
       ${stockPill(item)}
     </li>`).join("")
 }
 
 function stockPill(item) {
+  if (item.tracking === "none") {
+    return item.on_list ? `<span class="shrink-0 rounded-full bg-primary px-4 py-1.5 text-[13px] font-bold text-primary-content">On list</span>` : ""
+  }
   const tone = item.empty ? "bg-error text-error-content" : item.tracking === "count" ? "bg-base-300/60" : item.stock_level === "low" ? "bg-warning text-warning-content" : "bg-success text-success-content"
   const text = item.empty ? "Empty" : item.tracking === "count" ? item.stock_count : item.stock_level === "low" ? "Low" : "Plenty"
   return `<span class="shrink-0 rounded-full px-4 py-1.5 text-[13px] font-bold tabular-nums ${tone}">${text}</span>`

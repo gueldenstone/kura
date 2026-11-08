@@ -1,7 +1,8 @@
 defmodule Kura.Inventory.Item do
   @moduledoc """
   A kitchen item in the permanent catalogue. Items are never removed when they run out;
-  they are just empty. Each item tracks its stock either as a `:count` or as a `:level`.
+  they are just empty. Each item tracks its stock as a `:count` or as a `:level`, or not at all
+  (`:none`) for things that are only ever bought when needed.
   """
   use Ash.Resource,
     otp_app: :kura,
@@ -100,10 +101,14 @@ defmodule Kura.Inventory.Item do
       accept []
       require_atomic? false
 
+      validate attribute_does_not_equal(:tracking, :none),
+        message: "items without stock cannot run empty"
+
       change fn changeset, _context ->
         case Ash.Changeset.get_attribute(changeset, :tracking) do
           :count -> Ash.Changeset.force_change_attribute(changeset, :stock_count, 0)
           :level -> Ash.Changeset.force_change_attribute(changeset, :stock_level, :empty)
+          :none -> changeset
         end
       end
 
@@ -124,24 +129,26 @@ defmodule Kura.Inventory.Item do
     end
 
     read :to_check do
-      description "All items, the ones whose stock was checked or changed longest ago first."
+      description "All items with stock, the ones whose stock was checked or changed longest ago first."
+
+      filter expr(tracking != :none)
 
       prepare build(sort: [stock_checked_at: :asc, name: :asc], load: [:tags, :locations])
     end
 
     read :to_check_at do
-      description "The items that live in a location, the ones whose stock was checked or changed longest ago first."
+      description "The items with stock that live in a location, the ones whose stock was checked or changed longest ago first."
       argument :location_id, :uuid, allow_nil?: false
 
-      filter expr(exists(locations, id == ^arg(:location_id)))
+      filter expr(tracking != :none and exists(locations, id == ^arg(:location_id)))
 
       prepare build(sort: [stock_checked_at: :asc, name: :asc], load: [:tags, :locations])
     end
 
     read :to_check_unplaced do
-      description "The items without any location, the ones whose stock was checked or changed longest ago first."
+      description "The items with stock but without any location, the ones whose stock was checked or changed longest ago first."
 
-      filter expr(not exists(locations, true))
+      filter expr(tracking != :none and not exists(locations, true))
 
       prepare build(sort: [stock_checked_at: :asc, name: :asc], load: [:tags, :locations])
     end
@@ -185,7 +192,7 @@ defmodule Kura.Inventory.Item do
       allow_nil? false
       public? true
       writable? true
-      constraints one_of: [:count, :level]
+      constraints one_of: [:count, :level, :none]
     end
 
     attribute :stock_count, :integer do

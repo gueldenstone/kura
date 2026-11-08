@@ -27,7 +27,7 @@ Template:
 | [0002](0002-ash-sqlite-stack.md) | Ash with SQLite and AshAuthentication | Accepted |
 | [0003](0003-pwa-offline-strategy.md) | PWA with offline reads and queued check-offs | Accepted |
 | [0004](0004-username-password-auth-no-registration.md) | Username/password auth without registration | Accepted |
-| [0005](0005-item-stock-model.md) | Items with per-item stock tracking in one resource | Accepted |
+| [0005](0005-item-stock-model.md) | Items with per-item stock tracking in one resource | Accepted, extended by 0013 |
 | [0006](0006-visual-design.md) | Visual design: market stall light, dark chocolate dark | Accepted |
 | [0007](0007-shopping-list-model.md) | Shopping list model and live sync | Accepted |
 | [0008](0008-offline-implementation.md) | How offline works | Accepted |
@@ -35,3 +35,4 @@ Template:
 | [0010](0010-item-tags.md) | Items are told apart by name and tags | Accepted |
 | [0011](0011-item-locations.md) | Items live in locations, stock stays per item | Accepted |
 | [0012](0012-sign-in-throttling.md) | Failed sign-ins lock the username for a while, counted in memory | Accepted |
+| [0013](0013-items-without-stock.md) | Items without stock tracking | Accepted |

@@ -73,6 +73,13 @@
     const walnuts = applyQueue(snapshot(), [{op: "check", entry_id: "e2"}]).items.find(i => i.id === "i2")
     same([walnuts.stock_level, walnuts.empty, walnuts.on_list], ["plenty", false, false])
   })
+  test("check gives an item without stock no stock", () => {
+    const start = snapshot()
+    start.items.push({id: "i4", name: "Candles", tracking: "none", stock_count: null, stock_level: null, empty: false, on_list: true})
+    start.open.push({id: "e4", item_id: "i4", name: "Candles", quantity: 2, checked_at: null})
+    const candles = applyQueue(start, [{op: "check", entry_id: "e4"}]).items.find(i => i.id === "i4")
+    same([candles.stock_count, candles.stock_level, candles.empty, candles.on_list], [null, null, false, false])
+  })
   test("uncheck puts the entry back, sorted by name, and takes the count off again", () => {
     const result = applyQueue(snapshot(), [{op: "uncheck", entry_id: "e3"}])
     same(result.open.map(e => e.id), ["e1", "e3", "e2"])

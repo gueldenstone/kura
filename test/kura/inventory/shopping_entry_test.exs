@@ -124,6 +124,18 @@ defmodule Kura.Inventory.ShoppingEntryTest do
       assert entry.previous_level == :low
     end
 
+    test "leaves an item without stock as it is, also when unchecked", %{actor: actor} do
+      item = Inventory.create_item!(%{name: "Candles", tracking: :none}, actor: actor)
+      entry = Inventory.check_off_entry!(add(actor, item, %{quantity: 2}), actor: actor)
+
+      assert entry.checked_at
+      assert %{stock_count: nil, stock_level: nil} = stock(actor, item)
+
+      entry = Inventory.uncheck_entry!(entry, actor: actor)
+      assert entry.checked_at == nil
+      assert %{stock_count: nil, stock_level: nil} = stock(actor, item)
+    end
+
     test "starts a new trip: entries checked off over a day ago are cleared", %{actor: actor} do
       old = Inventory.check_off_entry!(add(actor, apples(actor)), actor: actor)
       Ash.Seed.update!(old, %{checked_at: DateTime.add(DateTime.utc_now(), -25, :hour)})

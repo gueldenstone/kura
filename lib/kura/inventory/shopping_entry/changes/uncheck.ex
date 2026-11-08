@@ -28,4 +28,5 @@ defmodule Kura.Inventory.ShoppingEntry.Changes.Uncheck do
        do: Inventory.set_item_level!(item, previous_level, opts)
 
   defp unstock(%Item{tracking: :level}, _quantity, nil, _opts), do: :ok
+  defp unstock(%Item{tracking: :none}, _quantity, _previous_level, _opts), do: :ok
 end

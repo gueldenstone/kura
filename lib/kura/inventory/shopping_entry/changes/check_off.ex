@@ -1,7 +1,8 @@
 defmodule Kura.Inventory.ShoppingEntry.Changes.CheckOff do
   @moduledoc """
   Marks the entry as checked off and restocks its item: a count item gains the entry's quantity,
-  a level item goes to plenty (the previous level is kept on the entry for undo). Entries that were
+  a level item goes to plenty (the previous level is kept on the entry for undo), an item without
+  stock stays as it is. Entries that were
   checked off over a day ago are cleared first: that is the start of a new shopping trip.
   """
   use Ash.Resource.Change
@@ -34,4 +35,6 @@ defmodule Kura.Inventory.ShoppingEntry.Changes.CheckOff do
 
   defp restock(%Item{tracking: :level} = item, _quantity, opts),
     do: Inventory.set_item_level!(item, :plenty, opts)
+
+  defp restock(%Item{tracking: :none}, _quantity, _opts), do: :ok
 end
