@@ -48,6 +48,29 @@ defmodule KuraWeb.AuthTest do
       assert html =~ "Shopping list"
     end
 
+    test "with remember me survives losing the session cookie", %{conn: conn} do
+      %{password: password} = create_user("lukas")
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      form =
+        form(view, "#user-password-sign-in-with-password",
+          user: %{username: "lukas", password: password, remember_me: "true"}
+        )
+
+      conn = submit_form(form, conn)
+      remember_me = conn.resp_cookies["remember_me"]
+      assert remember_me.max_age > 0
+
+      # A phone that closes the PWA drops the session cookie but keeps the
+      # persistent remember-me cookie.
+      conn =
+        build_conn()
+        |> put_req_cookie("remember_me", remember_me.value)
+        |> get(~p"/")
+
+      assert html_response(conn, 200) =~ "Shopping list"
+    end
+
     test "with a wrong password stays signed out", %{conn: conn} do
       create_user("lukas")
       {:ok, view, _html} = live(conn, ~p"/sign-in")
