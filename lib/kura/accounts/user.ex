@@ -57,8 +57,9 @@ defmodule Kura.Accounts.User do
       argument :password, :string, allow_nil?: false, sensitive?: true
 
       argument :remember_me, :boolean do
-        description "Whether to generate a remember me token."
+        description "Whether to generate a remember me token. On by default: the phones should stay signed in."
         allow_nil? true
+        default true
       end
 
       prepare Kura.Accounts.User.Preparations.ThrottleSignIn

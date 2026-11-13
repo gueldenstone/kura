@@ -8,6 +8,7 @@ _Nothing open._
 
 ## Done
 
+- [x] The phones kept getting signed out, also after the remember-me cookie was read back (2026-11-08). A session token that had run out blocked the cookie, "Remember me" was unticked by default, and the cookie was never renewed. Fixed in ADR 0015.
 - [x] The stock tracking option "level" should be the default when adding an item (was "count"). Since 2026-11-08 the default is "none" (items without stock, ADR 0013).
 - [x] "None" (no stock) should be the default tracking when adding an item.
 - [x] Adding a newly bought item should be doable from the keyboard on a laptop: type the name into the search bar and press Enter to add it, instead of clicking "Add new", so adding a bunch of things is faster. Enter does the same as clicking "Add": it opens the add form (level by default) so tracking can be changed before adding; an existing name does nothing.

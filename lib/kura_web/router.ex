@@ -12,15 +12,15 @@ defmodule KuraWeb.Router do
     plug :put_root_layout, html: {KuraWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
-    plug :sign_in_with_remember_me
     plug :load_from_session
+    plug KuraWeb.Plugs.RememberMe
   end
 
   pipeline :offline_api do
     plug :accepts, ["json"]
     plug :fetch_session
-    plug :sign_in_with_remember_me
     plug :load_from_session
+    plug KuraWeb.Plugs.RememberMe
   end
 
   pipeline :api do

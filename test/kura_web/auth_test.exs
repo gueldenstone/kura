@@ -71,6 +71,72 @@ defmodule KuraWeb.AuthTest do
       assert html_response(conn, 200) =~ "Shopping list"
     end
 
+    test "remember me is ticked by default, so a plain sign-in stays signed in", %{conn: conn} do
+      %{password: password} = create_user("lukas")
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      assert has_element?(view, "input[type=checkbox][name='user[remember_me]'][checked]")
+
+      form =
+        form(view, "#user-password-sign-in-with-password",
+          user: %{username: "lukas", password: password}
+        )
+
+      conn = submit_form(form, conn)
+      assert conn.resp_cookies["remember_me"].max_age > 0
+    end
+
+    test "a session whose token stopped working falls back to remember me", %{conn: conn} do
+      %{password: password} = create_user("lukas")
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      form =
+        form(view, "#user-password-sign-in-with-password",
+          user: %{username: "lukas", password: password, remember_me: "true"}
+        )
+
+      conn = submit_form(form, conn)
+      session = conn.resp_cookies["_kura_key"].value
+      remember_me = conn.resp_cookies["remember_me"].value
+
+      # The session token runs out after 14 days and is then removed from the token table.
+      Kura.Repo.query!("DELETE FROM tokens WHERE purpose = 'user'")
+
+      stale = fn path ->
+        build_conn()
+        |> put_req_cookie("_kura_key", session)
+        |> put_req_cookie("remember_me", remember_me)
+        |> get(path)
+      end
+
+      conn = stale.(~p"/")
+      assert html_response(conn, 200) =~ "Shopping list"
+
+      # Signing in from the cookie renews it, so the 30 days start again.
+      renewed = conn.resp_cookies["remember_me"]
+      assert renewed.max_age > 0
+      assert renewed.value != remember_me
+
+      # A LiveView that reconnects with the stale session is sent to the sign-in page, which the
+      # browser loads with the same cookies: it must sign in from remember me, not ask again.
+      assert redirected_to(stale.(~p"/sign-in")) == ~p"/"
+    end
+
+    test "a request with a working session leaves the remember-me cookie alone", %{conn: conn} do
+      %{password: password} = create_user("lukas")
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      form =
+        form(view, "#user-password-sign-in-with-password",
+          user: %{username: "lukas", password: password}
+        )
+
+      conn = form |> submit_form(conn) |> recycle() |> get(~p"/")
+
+      assert html_response(conn, 200) =~ "Shopping list"
+      refute Map.has_key?(conn.resp_cookies, "remember_me")
+    end
+
     test "with a wrong password stays signed out", %{conn: conn} do
       create_user("lukas")
       {:ok, view, _html} = live(conn, ~p"/sign-in")

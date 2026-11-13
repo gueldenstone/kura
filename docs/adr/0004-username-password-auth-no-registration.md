@@ -1,6 +1,6 @@
 # 0004. Username/password auth without registration
 
-- Status: Accepted
+- Status: Accepted, extended by 0015 (how remember-me keeps the phones signed in)
 - Date: 2026-10-31
 
 ## Context
